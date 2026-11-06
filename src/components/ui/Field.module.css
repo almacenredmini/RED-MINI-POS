@@ -1,0 +1,86 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--text-faint);
+}
+
+.error {
+  font-size: 0.8rem;
+  color: var(--danger);
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+
+.control:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+.invalid {
+  border-color: var(--danger);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 12px;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.input:focus-visible {
+  box-shadow: none;
+}
+
+select.input {
+  appearance: none;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 32px;
+}
+
+select.input option {
+  background: var(--surface);
+}
+
+.affix {
+  padding: 0 12px;
+  color: var(--text-faint);
+  font-size: 0.9rem;
+}
+
+.affix:first-child {
+  padding-right: 0;
+}
+
+.affix:last-child {
+  padding-left: 0;
+}

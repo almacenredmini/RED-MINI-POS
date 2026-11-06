@@ -1,0 +1,19 @@
+.search {
+  position: sticky;
+  top: calc(var(--topbar-h) + env(safe-area-inset-top));
+  z-index: 10;
+  padding: 0 0 12px;
+  background: var(--bg);
+}
+
+@media (min-width: 900px) {
+  .search {
+    top: 0;
+    padding-top: 8px;
+  }
+}
+
+.list {
+  padding: 0;
+  overflow: hidden;
+}

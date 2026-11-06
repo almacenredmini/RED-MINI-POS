@@ -1,0 +1,29 @@
+.bar {
+  position: fixed;
+  z-index: 90;
+  top: calc(var(--topbar-h) + 12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 10px 10px 10px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-weight: 500;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+@media (min-width: 900px) {
+  .bar {
+    top: 16px;
+  }
+}

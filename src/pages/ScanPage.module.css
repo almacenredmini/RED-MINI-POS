@@ -1,0 +1,50 @@
+.layout {
+  display: grid;
+  gap: 16px;
+  max-width: 640px;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: rise 0.2s var(--ease);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.found {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.info,
+.missing {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.price {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.addStock {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
