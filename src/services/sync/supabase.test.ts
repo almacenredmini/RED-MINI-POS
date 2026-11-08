@@ -28,6 +28,18 @@ describe('conexión con Supabase', () => {
     await expect(signIn(conn, 'a', 'b')).rejects.toBeInstanceOf(SyncNetworkError);
   });
 
+  it('explica el motivo cuando Supabase rechaza el ingreso', async () => {
+    const reason = async (status: number, body: object) => {
+      vi.stubGlobal('fetch', vi.fn(async () => json(status, body)));
+      return signIn(conn, 'a', 'b').catch((e: Error) => e.message);
+    };
+    expect(await reason(400, { error_code: 'invalid_credentials' })).toContain('Correo o contraseña incorrectos');
+    expect(await reason(400, { error_code: 'email_not_confirmed' })).toContain('Auto Confirm User');
+    expect(await reason(422, { error_code: 'email_provider_disabled' })).toContain('habilitá Email');
+    expect(await reason(401, { message: 'Invalid API key' })).toContain('Publishable key');
+    expect(await reason(400, { msg: 'Algo raro' })).toContain('Algo raro');
+  });
+
   it('si la sesión venció la renueva, la guarda y reintenta', async () => {
     const onSession = vi.fn(async () => undefined);
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {

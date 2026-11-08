@@ -19,6 +19,19 @@ async function request(url: string, init: RequestInit): Promise<Response> {
   }
 }
 
+/** Supabase responde con distintos códigos; "contraseña incorrecta" para todo hace imposible saber qué corregir. */
+async function authErrorMessage(res: Response, grant: string): Promise<string> {
+  const data = (await res.json().catch(() => ({}))) as { error_code?: string; msg?: string; message?: string; error_description?: string };
+  const code = data.error_code ?? '';
+  if (code === 'invalid_credentials') return 'Correo o contraseña incorrectos. Usá la contraseña del usuario creado en Supabase, no la de admin.';
+  if (code === 'email_not_confirmed') return 'El usuario no está confirmado. En Supabase, crealo de nuevo marcando Auto Confirm User.';
+  if (code === 'email_provider_disabled') return 'El inicio de sesión por correo está desactivado. En Supabase, Sign In / Providers, habilitá Email.';
+  if (res.status === 401 || /api key/i.test(data.message ?? '')) return 'La clave pública no es válida. Copiá de nuevo la Publishable key.';
+  if (grant !== 'password') return 'La sesión venció: volvé a vincular este dispositivo';
+  const detail = data.msg ?? data.error_description ?? data.message;
+  return detail ? `Supabase rechazó el ingreso: ${detail}` : `Supabase rechazó el ingreso (código ${res.status})`;
+}
+
 async function authRequest(conn: SupabaseConnection, grant: string, body: object): Promise<SupabaseSession> {
   const res = await request(`${conn.url}/auth/v1/token?grant_type=${grant}`, {
     method: 'POST',
@@ -26,7 +39,7 @@ async function authRequest(conn: SupabaseConnection, grant: string, body: object
     body: JSON.stringify(body),
   });
   if (res.status >= 500) throw new SyncNetworkError('El servidor no está disponible');
-  if (!res.ok) throw new SyncAuthError(grant === 'password' ? 'Correo o contraseña incorrectos' : 'La sesión venció: volvé a vincular este dispositivo');
+  if (!res.ok) throw new SyncAuthError(await authErrorMessage(res, grant));
   const { access_token, refresh_token } = (await res.json()) as SupabaseSession;
   return { access_token, refresh_token };
 }
