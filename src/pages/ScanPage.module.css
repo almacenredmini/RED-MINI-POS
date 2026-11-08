@@ -48,3 +48,13 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+}

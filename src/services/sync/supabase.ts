@@ -15,7 +15,8 @@ async function request(url: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(url, init);
   } catch {
-    throw new SyncNetworkError('Sin conexión con el servidor');
+    const host = new URL(url).host;
+    throw new SyncNetworkError(`No se pudo conectar con ${host}. Revisá que la dirección sea la del proyecto (https://….supabase.co) y que haya Internet.`);
   }
 }
 

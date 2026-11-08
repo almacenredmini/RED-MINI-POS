@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { useSyncStatus } from '@/components/layout/SyncIndicator';
-import { clearSyncConfig, decodeLinkCode, encodeLinkCode, getSyncConfig, LAST_SYNC_KEY, saveSyncConfig } from '@/services/sync/config';
+import { clearSyncConfig, decodeLinkCode, encodeLinkCode, getSyncConfig, LAST_SYNC_KEY, normalizeProjectUrl, saveSyncConfig } from '@/services/sync/config';
 import { requeueErrors, syncNow } from '@/services/sync/engine';
 import { signIn } from '@/services/sync/supabase';
 import { SyncAuthError, SyncNetworkError } from '@/services/sync/transport';
@@ -33,7 +33,7 @@ function LinkForm() {
     setCode(value);
     const conn = decodeLinkCode(value);
     if (conn) {
-      setUrl(conn.url);
+      setUrl(normalizeProjectUrl(conn.url) ?? conn.url);
       setAnonKey(conn.anon_key);
     }
   };
@@ -42,7 +42,14 @@ function LinkForm() {
     setBusy(true);
     setError(null);
     try {
-      const conn = { url: url.trim().replace(/\/+$/, ''), anon_key: anonKey.trim() };
+      const projectUrl = normalizeProjectUrl(url);
+      if (!projectUrl) {
+        setError('La dirección no es válida. Tiene que ser como https://xxxx.supabase.co');
+        setBusy(false);
+        return;
+      }
+      setUrl(projectUrl);
+      const conn = { url: projectUrl, anon_key: anonKey.replace(/\s+/g, '') };
       const session = await signIn(conn, email.trim(), password);
       await saveSyncConfig({ ...conn, email: email.trim(), session, scope_store_id: scope === ALL_STORES ? null : scope });
       setPassword('');
@@ -56,6 +63,7 @@ function LinkForm() {
   return (
     <div className={styles.form}>
       <p className="muted">Conectá este dispositivo para que sus cambios lleguen a los demás. Las ventas siguen funcionando sin Internet.</p>
+      {code.trim() && !decodeLinkCode(code) && <p className={styles.error}>El código no es válido: copialo de nuevo completo desde el dispositivo vinculado.</p>}
       <Field label="Código de vinculación" hint="Si ya vinculaste otro dispositivo, copiá el código desde ahí y no hace falta completar la dirección ni la clave.">
         {(id) => <Input id={id} value={code} onChange={(e) => onCode(e.target.value)} autoComplete="off" />}
       </Field>

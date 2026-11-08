@@ -30,6 +30,8 @@ export function ScanPage() {
   const [result, setResult] = useState<Result | null>(null);
   const [manual, setManual] = useState('');
   const [quantity, setQuantity] = useState('');
+  // Paso intermedio: quien carga en varias sucursales confirma en cuál va a sumar antes de guardar.
+  const [confirming, setConfirming] = useState(false);
   const store = useCurrentStore();
   const { user, can } = useAuth();
   const toast = useToast();
@@ -41,18 +43,26 @@ export function ScanPage() {
     if (!result?.product || qty === null) return toast('Ingresá una cantidad válida', 'error');
     try {
       const total = await registerManualMovement({ kind: 'entry', storeId: store.id, product: result.product, quantity: qty, reason: 'Carga desde Escanear', userId: user?.id ?? null });
-      toast(`${result.product.name}: stock ${total}`, 'success');
+      toast(`${result.product.name}: stock en ${store.name} ${total}`, 'success');
       setQuantity('');
+      setConfirming(false);
       setResult(null);
     } catch (e) {
       toast(e instanceof InventoryError ? e.message : 'No se pudo cargar el stock', 'error');
     }
   };
 
+  const requestAdd = () => {
+    if (parseQuantity(quantity) === null) return toast('Ingresá una cantidad válida', 'error');
+    if (confirming) void addStock();
+    else setConfirming(true);
+  };
+
   const onCode = async (code: string) => {
     const product = (await findProductByBarcode(code)) ?? null;
     if (!product) scanFeedback(false);
     setQuantity('');
+    setConfirming(false);
     setResult({ code, product });
   };
 
@@ -94,22 +104,36 @@ export function ScanPage() {
                 <span className="muted num">Código {result.code}</span>
               </div>
             )}
-            {result.product && can('stock.adjust') && (
-              <div className={styles.addStock}>
-                <Input
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && void addStock()}
-                  placeholder="Cantidad que entra"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  aria-label="Cantidad que entra"
-                />
-                <Button variant="primary" icon="plus" disabled={parseQuantity(quantity) === null} onClick={() => void addStock()}>
-                  Agregar stock
-                </Button>
-              </div>
-            )}
+            {result.product && can('stock.adjust') &&
+              (confirming ? (
+                <div className={styles.confirm} role="alert">
+                  <p>
+                    ¿Sumar <strong className="num">{parseQuantity(quantity)}</strong> a <strong>{store.name}</strong>?
+                    <span className="muted num"> Queda en {current + (parseQuantity(quantity) ?? 0)}.</span>
+                  </p>
+                  <div className={styles.addStock}>
+                    <Button onClick={() => setConfirming(false)}>Cambiar</Button>
+                    <Button variant="primary" icon="check" onClick={() => void addStock()} autoFocus>
+                      Sí, sumar en {store.name}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.addStock}>
+                  <Input
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && requestAdd()}
+                    placeholder="Cantidad que entra"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    aria-label="Cantidad que entra"
+                  />
+                  <Button variant="primary" icon="plus" disabled={parseQuantity(quantity) === null} onClick={requestAdd}>
+                    Agregar stock
+                  </Button>
+                </div>
+              ))}
             <div className={styles.actions}>
               <Button onClick={() => setResult(null)}>Escanear otro</Button>
               {result.product ? (

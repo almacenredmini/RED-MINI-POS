@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { decodeLinkCode, encodeLinkCode } from './config';
+import { decodeLinkCode, encodeLinkCode, normalizeProjectUrl } from './config';
 import { createSupabaseTransport, signIn } from './supabase';
 import { SyncAuthError, SyncNetworkError } from './transport';
 
@@ -63,6 +63,26 @@ describe('conexión con Supabase', () => {
   it('un error del servidor se reintenta y no pide vincular', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => json(500, {})));
     await expect(createSupabaseTransport(conn, session, vi.fn()).push('d', [])).rejects.toBeInstanceOf(SyncNetworkError);
+  });
+
+  it('corrige los errores comunes al tipear la dirección en el celular', () => {
+    expect(normalizeProjectUrl('pwqy.supabase.co')).toBe('https://pwqy.supabase.co');
+    expect(normalizeProjectUrl(' http://pwqy.supabase.co/ ')).toBe('https://pwqy.supabase.co');
+    expect(normalizeProjectUrl('https://pwqy.supabase.co/rest/v1/')).toBe('https://pwqy.supabase.co');
+    expect(normalizeProjectUrl('https://pwqy. supabase.co')).toBe('https://pwqy.supabase.co');
+    expect(normalizeProjectUrl('http://localhost:54399')).toBe('http://localhost:54399');
+    expect(normalizeProjectUrl('cualquiera')).toBeNull();
+    expect(normalizeProjectUrl('')).toBeNull();
+  });
+
+  it('acepta el código aunque WhatsApp le agregue espacios o saltos de línea', () => {
+    const code = encodeLinkCode(conn);
+    expect(decodeLinkCode(`${code.slice(0, 10)}\n ${code.slice(10)} `)).toEqual(conn);
+  });
+
+  it('si no hay conexión, dice a qué dirección intentó conectarse', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('failed'); }));
+    await expect(signIn(conn, 'a', 'b')).rejects.toThrow('x.supabase.co');
   });
 
   it('el código de vinculación lleva la dirección y la clave, nunca la sesión', () => {

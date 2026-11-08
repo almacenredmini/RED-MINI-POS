@@ -33,6 +33,26 @@ export async function clearSyncConfig(): Promise<void> {
   await db.meta.bulkDelete([KEY, CURSOR_KEY]);
 }
 
+/**
+ * Tipear la dirección en el celular es fácil de errar: se completan "https://", se pasa "http://" a "https://"
+ * (una página segura no puede conectarse a una que no lo es) y se quitan espacios y barras finales.
+ * Devuelve null si no parece una dirección.
+ */
+export function normalizeProjectUrl(raw: string): string | null {
+  let text = raw.replace(/\s+/g, '').replace(/\/+$/, '');
+  if (!text) return null;
+  if (!/^https?:\/\//i.test(text)) text = `https://${text}`;
+  try {
+    const url = new URL(text);
+    const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    if (!local && url.protocol === 'http:') url.protocol = 'https:';
+    if (!url.hostname.includes('.') && !local) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
 /** Código para no tipear la dirección y la clave en el celular. La clave anónima no da acceso sin iniciar sesión. */
 export function encodeLinkCode(conn: SupabaseConnection): string {
   return btoa(JSON.stringify({ url: conn.url, anon_key: conn.anon_key }));
@@ -40,7 +60,7 @@ export function encodeLinkCode(conn: SupabaseConnection): string {
 
 export function decodeLinkCode(code: string): SupabaseConnection | null {
   try {
-    const parsed = JSON.parse(atob(code.trim())) as Partial<SupabaseConnection>;
+    const parsed = JSON.parse(atob(code.replace(/\s+/g, ''))) as Partial<SupabaseConnection>;
     return parsed.url && parsed.anon_key ? { url: parsed.url, anon_key: parsed.anon_key } : null;
   } catch {
     return null;
