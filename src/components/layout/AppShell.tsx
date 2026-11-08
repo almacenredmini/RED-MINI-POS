@@ -11,7 +11,6 @@ import { LoginPage } from '@/pages/LoginPage';
 import { SyncIndicator } from './SyncIndicator';
 import { StorePicker } from './StorePicker';
 import { StoreSwitcher } from './StoreSwitcher';
-import { UpdatePrompt } from './UpdatePrompt';
 import { NAV_ITEMS } from './navigation';
 import styles from './AppShell.module.css';
 
@@ -100,7 +99,6 @@ export function AppShell() {
         </nav>
       )}
 
-      <UpdatePrompt />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { DeviceProvider } from '@/contexts/DeviceContext';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { applyTheme, getTheme } from '@/services/theme';
 import { SyncRunner } from '@/components/layout/SyncRunner';
+import { UpdatePrompt } from '@/components/layout/UpdatePrompt';
 import { router } from './router';
 
 applyTheme(getTheme());
@@ -18,6 +19,8 @@ createRoot(document.getElementById('root')!).render(
       <DeviceProvider>
         <AuthProvider>
           <SyncRunner />
+          {/* Fuera del login: el modo sin Internet se instala apenas se abre la app. */}
+          <UpdatePrompt />
           <RouterProvider router={router} />
         </AuthProvider>
       </DeviceProvider>
