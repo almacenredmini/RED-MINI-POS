@@ -41,6 +41,14 @@ describe('conexión con Supabase', () => {
     expect(await reason(400, { msg: 'Algo raro' })).toContain('Algo raro');
   });
 
+  it('un dispositivo vinculado con punto final en la dirección se conecta igual', async () => {
+    const fetchMock = vi.fn(async () => json(200, { changes: [], next_cursor: 0, has_more: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    await createSupabaseTransport({ url: 'https://x.supabase.co.', anon_key: 'k' }, session, vi.fn()).pull(0, null, 1);
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe('https://x.supabase.co/rest/v1/rpc/sync_pull');
+    expect(atob(encodeLinkCode({ url: 'https://x.supabase.co.', anon_key: 'k' }))).toContain('"https://x.supabase.co"');
+  });
+
   it('si la sesión venció la renueva, la guarda y reintenta', async () => {
     const onSession = vi.fn(async () => undefined);
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
@@ -72,6 +80,7 @@ describe('conexión con Supabase', () => {
     expect(normalizeProjectUrl('https://pwqy.supabase.co/rest/v1/')).toBe('https://pwqy.supabase.co');
     expect(normalizeProjectUrl('https://pwqy. supabase.co')).toBe('https://pwqy.supabase.co');
     expect(normalizeProjectUrl('http://localhost:54399')).toBe('http://localhost:54399');
+    expect(normalizeProjectUrl('https://pwqy.supabase.co.')).toBe('https://pwqy.supabase.co');
     expect(normalizeProjectUrl('cualquiera')).toBeNull();
     expect(normalizeProjectUrl('')).toBeNull();
   });

@@ -1,3 +1,4 @@
+import { normalizeProjectUrl } from './config';
 import { SyncAuthError, SyncNetworkError, type PullPage, type PushOp, type PushResult, type SyncTransport } from './transport';
 
 export interface SupabaseSession {
@@ -51,7 +52,9 @@ export function signIn(conn: SupabaseConnection, email: string, password: string
   return authRequest(conn, 'password', { email, password });
 }
 
-export function createSupabaseTransport(conn: SupabaseConnection, initial: SupabaseSession, onSession: (s: SupabaseSession) => Promise<void>): SyncTransport {
+export function createSupabaseTransport(connection: SupabaseConnection, initial: SupabaseSession, onSession: (s: SupabaseSession) => Promise<void>): SyncTransport {
+  // Corrige también dispositivos vinculados antes con una dirección mal pegada.
+  const conn = { ...connection, url: normalizeProjectUrl(connection.url) ?? connection.url };
   let session = initial;
 
   const post = (fn: string, body: object) =>

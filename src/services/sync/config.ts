@@ -52,6 +52,8 @@ export function normalizeProjectUrl(raw: string): string | null {
   if (!/^https?:\/\//i.test(text)) text = `https://${text}`;
   try {
     const url = new URL(text);
+    // "supabase.co." con punto final: Chrome lo tolera, pero Safari en iPhone no puede conectarse.
+    url.hostname = url.hostname.replace(/\.+$/, '');
     const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     if (!local && url.protocol === 'http:') url.protocol = 'https:';
     if (!url.hostname.includes('.') && !local) return null;
@@ -63,7 +65,7 @@ export function normalizeProjectUrl(raw: string): string | null {
 
 /** Código para no tipear la dirección y la clave en el celular. La clave anónima no da acceso sin iniciar sesión. */
 export function encodeLinkCode(conn: SupabaseConnection): string {
-  return btoa(JSON.stringify({ url: conn.url, anon_key: conn.anon_key }));
+  return btoa(JSON.stringify({ url: normalizeProjectUrl(conn.url) ?? conn.url, anon_key: cleanCredential(conn.anon_key) }));
 }
 
 export function decodeLinkCode(code: string): SupabaseConnection | null {
