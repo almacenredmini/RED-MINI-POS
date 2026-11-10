@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { useSyncStatus } from '@/components/layout/SyncIndicator';
-import { clearSyncConfig, decodeLinkCode, encodeLinkCode, getSyncConfig, LAST_SYNC_KEY, normalizeProjectUrl, saveSyncConfig } from '@/services/sync/config';
+import { cleanCredential, clearSyncConfig, decodeLinkCode, encodeLinkCode, getSyncConfig, LAST_SYNC_KEY, normalizeProjectUrl, saveSyncConfig } from '@/services/sync/config';
 import { requeueErrors, syncNow } from '@/services/sync/engine';
 import { signIn } from '@/services/sync/supabase';
 import { SyncAuthError, SyncNetworkError } from '@/services/sync/transport';
@@ -49,9 +49,9 @@ function LinkForm() {
         return;
       }
       setUrl(projectUrl);
-      const conn = { url: projectUrl, anon_key: anonKey.replace(/\s+/g, '') };
-      const session = await signIn(conn, email.trim(), password);
-      await saveSyncConfig({ ...conn, email: email.trim(), session, scope_store_id: scope === ALL_STORES ? null : scope });
+      const conn = { url: projectUrl, anon_key: cleanCredential(anonKey) };
+      const session = await signIn(conn, cleanCredential(email), password);
+      await saveSyncConfig({ ...conn, email: cleanCredential(email), session, scope_store_id: scope === ALL_STORES ? null : scope });
       setPassword('');
       void syncNow();
     } catch (e) {

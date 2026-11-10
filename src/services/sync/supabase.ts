@@ -14,9 +14,11 @@ export interface SupabaseConnection {
 async function request(url: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(url, init);
-  } catch {
+  } catch (e) {
     const host = new URL(url).host;
-    throw new SyncNetworkError(`No se pudo conectar con ${host}. Revisá que la dirección sea la del proyecto (https://….supabase.co) y que haya Internet.`);
+    // El detalle técnico distingue un corte de red de un dato inválido rechazado por el propio navegador.
+    const detail = e instanceof Error ? ` (${e.name}: ${e.message})` : '';
+    throw new SyncNetworkError(`No se pudo conectar con ${host}. Revisá que la dirección sea la del proyecto (https://….supabase.co) y que haya Internet.${detail}`);
   }
 }
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { decodeLinkCode, encodeLinkCode, normalizeProjectUrl } from './config';
+import { cleanCredential, decodeLinkCode, encodeLinkCode, normalizeProjectUrl } from './config';
 import { createSupabaseTransport, signIn } from './supabase';
 import { SyncAuthError, SyncNetworkError } from './transport';
 
@@ -78,6 +78,14 @@ describe('conexión con Supabase', () => {
   it('acepta el código aunque WhatsApp le agregue espacios o saltos de línea', () => {
     const code = encodeLinkCode(conn);
     expect(decodeLinkCode(`${code.slice(0, 10)}\n ${code.slice(10)} `)).toEqual(conn);
+  });
+
+  it('quita los caracteres invisibles que agregan WhatsApp y otras apps al copiar', () => {
+    const invisible = '\u200e\u200b\u00a0';
+    expect(cleanCredential(`${invisible}sb_publishable_ABC${invisible}\n`)).toBe('sb_publishable_ABC');
+    expect(normalizeProjectUrl(`https://pwqy${invisible}.supabase.co`)).toBe('https://pwqy.supabase.co');
+    const code = encodeLinkCode({ url: 'https://pwqy.supabase.co', anon_key: 'sb_publishable_ABC' });
+    expect(decodeLinkCode(`${invisible}${code}${invisible}`)).toEqual({ url: 'https://pwqy.supabase.co', anon_key: 'sb_publishable_ABC' });
   });
 
   it('si no hay conexión, dice a qué dirección intentó conectarse', async () => {

@@ -34,12 +34,20 @@ export async function clearSyncConfig(): Promise<void> {
 }
 
 /**
+ * Deja sólo caracteres visibles comunes. Al copiar desde WhatsApp u otras apps viajan caracteres invisibles
+ * (marcas de dirección de texto, espacios de ancho cero) que el navegador rechaza al enviar la clave.
+ */
+export function cleanCredential(raw: string): string {
+  return raw.replace(/[^\x21-\x7E]/g, '');
+}
+
+/**
  * Tipear la dirección en el celular es fácil de errar: se completan "https://", se pasa "http://" a "https://"
  * (una página segura no puede conectarse a una que no lo es) y se quitan espacios y barras finales.
  * Devuelve null si no parece una dirección.
  */
 export function normalizeProjectUrl(raw: string): string | null {
-  let text = raw.replace(/\s+/g, '').replace(/\/+$/, '');
+  let text = cleanCredential(raw).replace(/\/+$/, '');
   if (!text) return null;
   if (!/^https?:\/\//i.test(text)) text = `https://${text}`;
   try {
@@ -60,8 +68,8 @@ export function encodeLinkCode(conn: SupabaseConnection): string {
 
 export function decodeLinkCode(code: string): SupabaseConnection | null {
   try {
-    const parsed = JSON.parse(atob(code.replace(/\s+/g, ''))) as Partial<SupabaseConnection>;
-    return parsed.url && parsed.anon_key ? { url: parsed.url, anon_key: parsed.anon_key } : null;
+    const parsed = JSON.parse(atob(cleanCredential(code))) as Partial<SupabaseConnection>;
+    return parsed.url && parsed.anon_key ? { url: cleanCredential(parsed.url), anon_key: cleanCredential(parsed.anon_key) } : null;
   } catch {
     return null;
   }
