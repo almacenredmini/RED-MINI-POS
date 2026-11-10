@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { useSyncStatus } from '@/components/layout/SyncIndicator';
 import { cleanCredential, clearSyncConfig, decodeLinkCode, encodeLinkCode, getSyncConfig, LAST_SYNC_KEY, normalizeProjectUrl, saveSyncConfig } from '@/services/sync/config';
+import { diagnoseConnection, type DiagnosticStep } from '@/services/sync/diagnose';
 import { requeueErrors, syncNow } from '@/services/sync/engine';
 import { signIn } from '@/services/sync/supabase';
 import { SyncAuthError, SyncNetworkError } from '@/services/sync/transport';
@@ -28,6 +29,14 @@ function LinkForm() {
   const [scope, setScope] = useState(store.id);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [checks, setChecks] = useState<DiagnosticStep[] | null>(null);
+
+  const runDiagnosis = async () => {
+    const projectUrl = normalizeProjectUrl(url);
+    if (!projectUrl) return setError('La dirección no es válida. Tiene que ser como https://xxxx.supabase.co');
+    setChecks(null);
+    setChecks(await diagnoseConnection(projectUrl, cleanCredential(anonKey)));
+  };
 
   const onCode = (value: string) => {
     setCode(value);
@@ -87,6 +96,21 @@ function LinkForm() {
       <Button variant="primary" disabled={busy || !url || !anonKey || !email || !password} onClick={() => void link()}>
         {busy ? 'Vinculando…' : 'Vincular dispositivo'}
       </Button>
+      <Button disabled={!url || !anonKey} onClick={() => void runDiagnosis()}>
+        Probar conexión
+      </Button>
+      {checks && (
+        <ul className={styles.checks}>
+          {checks.map((c) => (
+            <li key={c.label} className={c.ok ? styles.checkOk : styles.checkFail}>
+              <strong>
+                {c.ok ? '✓' : '✗'} {c.label}
+              </strong>
+              <span>{c.detail}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

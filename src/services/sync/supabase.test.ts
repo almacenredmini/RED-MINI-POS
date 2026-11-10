@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanCredential, decodeLinkCode, encodeLinkCode, normalizeProjectUrl } from './config';
+import { diagnoseConnection } from './diagnose';
 import { createSupabaseTransport, signIn } from './supabase';
 import { SyncAuthError, SyncNetworkError } from './transport';
 
@@ -91,6 +92,19 @@ describe('conexión con Supabase', () => {
   it('si no hay conexión, dice a qué dirección intentó conectarse', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('failed'); }));
     await expect(signIn(conn, 'a', 'b')).rejects.toThrow('x.supabase.co');
+  });
+
+  it('la prueba de conexión separa cada paso y muestra el error de cada uno', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') throw new TypeError('Load failed');
+        return json(200, {});
+      }),
+    );
+    const steps = await diagnoseConnection('https://x.supabase.co', 'k');
+    expect(steps.map((s) => s.ok)).toEqual([true, true, false]);
+    expect(steps[2]?.detail).toBe('TypeError: Load failed');
   });
 
   it('el código de vinculación lleva la dirección y la clave, nunca la sesión', () => {

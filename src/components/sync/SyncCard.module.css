@@ -50,3 +50,31 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checks li {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.checkOk {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.checkFail {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
