@@ -17,7 +17,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const show = useCallback((message: string, tone: Tone = 'info') => {
     const id = nextId++;
-    setToasts((t) => [...t, { id, message, tone }]);
+    // El mismo aviso dos veces seguidas no aporta nada y tapa la pantalla.
+    setToasts((t) => (t.some((x) => x.message === message) ? t : [...t, { id, message, tone }]));
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
   }, []);
 
