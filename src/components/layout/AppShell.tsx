@@ -1,14 +1,14 @@
-import { useEffect, useRef, type MouseEvent } from 'react';
+import { Suspense, useEffect, useRef, type MouseEvent } from 'react';
 import { NavLink, Outlet, useLocation, type NavLinkProps } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDevice } from '@/contexts/DeviceContext';
 import { useToast } from '@/contexts/ToastContext';
 import { recalcMinStockIfNewWeek } from '@/database/repositories/minStock';
-import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Logo } from '@/components/ui/Logo';
 import { LoginPage } from '@/pages/LoginPage';
+import { ExitButton } from './ExitButton';
 import { SyncIndicator } from './SyncIndicator';
 import { StorePicker } from './StorePicker';
 import { StoreSwitcher } from './StoreSwitcher';
@@ -16,7 +16,7 @@ import { NAV_ITEMS, type NavItem } from './navigation';
 import styles from './AppShell.module.css';
 
 export function AppShell() {
-  const { user, restoring, can, logout, canSwitchStore } = useAuth();
+  const { user, restoring, can, canSwitchStore } = useAuth();
   const { stores, currentStore } = useDevice();
   const toast = useToast();
   const storeId = user ? currentStore?.id : undefined;
@@ -83,9 +83,7 @@ export function AppShell() {
             <StoreSwitcher />
             <SyncIndicator compact />
             <span className={styles.userName}>{user.name}</span>
-            <Button size="sm" variant="ghost" onClick={logout}>
-              Salir
-            </Button>
+            <ExitButton />
           </div>
         </div>
 
@@ -103,7 +101,9 @@ export function AppShell() {
       </header>
 
       <main className={styles.main}>
-        <Outlet />
+        <Suspense fallback={<p className="muted">Cargando…</p>}>
+          <Outlet />
+        </Suspense>
       </main>
 
       <nav className={styles.bottomnav} style={{ gridTemplateColumns: `repeat(${mobileItems.length}, 1fr)` }}>

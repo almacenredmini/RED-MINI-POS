@@ -14,7 +14,6 @@ import { ButtonLink, Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Field';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { ProductThumb } from '@/components/products/ProductThumb';
 import { formatMoney } from '@/services/money';
 import { parseQuantity } from '@/services/quantity';
 import type { Product } from '@/types/domain';
@@ -91,7 +90,6 @@ export function ScanPage() {
           <Card className={styles.result}>
             {result.product ? (
               <div className={styles.found}>
-                <ProductThumb productId={result.product.id} hasImage={result.product.has_image} size={64} />
                 <div className={styles.info}>
                   <strong>{result.product.name}</strong>
                   <span className={`${styles.price} num`}>{formatMoney(result.product.price_cents)}</span>

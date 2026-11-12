@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { Button } from '@/components/ui/Button';
+import { ExitButton } from './ExitButton';
 import { EmptyState } from '@/components/ui/Card';
 import type { PermissionKey } from '@/services/permissions';
 import { NAV_ITEMS } from './navigation';
@@ -14,11 +14,10 @@ function useFirstAllowedRoute(): string | null {
 
 /** Sin ninguna pantalla habilitada no hay adónde mandarlo: al menos tiene que poder salir. */
 function NoAccess() {
-  const { logout } = useAuth();
   return (
     <EmptyState icon="alert" title="Tu usuario no tiene pantallas habilitadas">
       <p>Pedile al dueño que te habilite al menos Vender.</p>
-      <Button onClick={logout}>Salir</Button>
+      <ExitButton variant="secondary" />
     </EmptyState>
   );
 }

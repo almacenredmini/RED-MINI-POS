@@ -1,21 +1,25 @@
+import { lazy } from 'react';
 import { createHashRouter } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { HomeRoute, RequirePermission } from '@/components/layout/RequirePermission';
 import { ButtonLink } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/Card';
 import { DashboardPage } from '@/pages/DashboardPage';
-import { ProductsPage } from '@/pages/ProductsPage';
-import { ProductEditPage } from '@/pages/ProductEditPage';
-import { ScanPage } from '@/pages/ScanPage';
-import { SettingsPage } from '@/pages/SettingsPage';
-import { ComingSoonPage } from '@/pages/ComingSoonPage';
 import { PosPage } from '@/pages/PosPage';
-import { SalesPage } from '@/pages/SalesPage';
-import { UsersPage } from '@/pages/UsersPage';
-import { AccountsPage } from '@/pages/AccountsPage';
-import { InventoryPage } from '@/pages/InventoryPage';
-import { PurchaseEditPage } from '@/pages/PurchaseEditPage';
-import { PurchasesPage } from '@/pages/PurchasesPage';
+
+// Vender e Inicio van en el paquete principal; el resto se carga al abrirlo (igual queda guardado para usar sin Internet).
+const ProductsPage = lazy(() => import('@/pages/ProductsPage').then((m) => ({ default: m.ProductsPage })));
+const ProductEditPage = lazy(() => import('@/pages/ProductEditPage').then((m) => ({ default: m.ProductEditPage })));
+const ScanPage = lazy(() => import('@/pages/ScanPage').then((m) => ({ default: m.ScanPage })));
+const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const ReportsPage = lazy(() => import('@/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const SalesPage = lazy(() => import('@/pages/SalesPage').then((m) => ({ default: m.SalesPage })));
+const UsersPage = lazy(() => import('@/pages/UsersPage').then((m) => ({ default: m.UsersPage })));
+const AccountsPage = lazy(() => import('@/pages/AccountsPage').then((m) => ({ default: m.AccountsPage })));
+const InventoryPage = lazy(() => import('@/pages/InventoryPage').then((m) => ({ default: m.InventoryPage })));
+const PurchaseEditPage = lazy(() => import('@/pages/PurchaseEditPage').then((m) => ({ default: m.PurchaseEditPage })));
+const PurchasesPage = lazy(() => import('@/pages/PurchasesPage').then((m) => ({ default: m.PurchasesPage })));
+const CashPage = lazy(() => import('@/pages/CashPage').then((m) => ({ default: m.CashPage })));
 
 /**
  * HashRouter: GitHub Pages no permite reescribir rutas al index.html.
@@ -32,6 +36,7 @@ export const router = createHashRouter([
       { path: 'escanear', element: <RequirePermission permission="products.edit"><ScanPage /></RequirePermission> },
       { path: 'ajustes', element: <RequirePermission permission="settings.manage"><SettingsPage /></RequirePermission> },
       { path: 'usuarios', element: <RequirePermission permission="users.manage"><UsersPage /></RequirePermission> },
+      { path: 'caja', element: <RequirePermission permission="sales.create"><CashPage /></RequirePermission> },
       { path: 'ventas', element: <RequirePermission permission="sales.void"><SalesPage /></RequirePermission> },
       { path: 'vender', element: <RequirePermission permission="sales.create"><PosPage /></RequirePermission> },
       { path: 'cuentas', element: <RequirePermission permission="accounts.manage"><AccountsPage /></RequirePermission> },
@@ -41,7 +46,7 @@ export const router = createHashRouter([
       { path: 'compras/:id', element: <RequirePermission permission="purchases.manage"><PurchaseEditPage /></RequirePermission> },
       {
         path: 'reportes',
-        element: <RequirePermission permission="reports.view"><ComingSoonPage title="Reportes" icon="reports" stage={5} features={['Rentabilidad', 'Más vendidos', 'Por horario', 'Por sucursal', 'Stock valorizado']} /></RequirePermission>,
+        element: <RequirePermission permission="reports.view"><ReportsPage /></RequirePermission>,
       },
       {
         path: '*',

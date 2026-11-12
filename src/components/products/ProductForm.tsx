@@ -12,7 +12,6 @@ import { Field, Input, Select } from '@/components/ui/Field';
 import type { ProductUnit } from '@/types/domain';
 import { formatMoney } from '@/services/money';
 import { BarcodeEditor } from './BarcodeEditor';
-import { ImagePicker } from './ImagePicker';
 import { PricingFields } from './PricingFields';
 import styles from './ProductForm.module.css';
 
@@ -46,7 +45,6 @@ export function ProductForm({ initial, productId, submitting, onSubmit, footer }
   const autoMin = useLiveQuery(() => (productId ? db.store_min_stock.get(`${store.id}:${productId}`) : undefined), [productId, store.id]);
   const currentStock = useLiveQuery(async () => (productId ? ((await db.stock.get(`${store.id}:${productId}`))?.quantity ?? 0) : 0), [productId, store.id], 0);
   const [v, setV] = useState(initial);
-  const [imageChanged, setImageChanged] = useState(false);
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deltaText, setDeltaText] = useState('');
@@ -71,7 +69,7 @@ export function ProductForm({ initial, productId, submitting, onSubmit, footer }
 
     let categoryId = v.category_id;
     if (newCategory?.trim()) categoryId = (await ensureCategory(newCategory)).id;
-    onSubmit({ ...v, category_id: categoryId, stock_delta: delta }, imageChanged);
+    onSubmit({ ...v, category_id: categoryId, stock_delta: delta }, false);
   };
 
   return (
@@ -122,9 +120,6 @@ export function ProductForm({ initial, productId, submitting, onSubmit, footer }
                   )
                 }
               </Field>
-              <Field label="Código interno (SKU)">
-                {(id) => <Input id={id} value={v.sku ?? ''} onChange={(e) => set('sku', e.target.value)} />}
-              </Field>
               <Field label="Unidad">
                 {(id) => (
                   <Select id={id} value={v.unit} onChange={(e) => set('unit', e.target.value as ProductUnit)}>
@@ -152,15 +147,6 @@ export function ProductForm({ initial, productId, submitting, onSubmit, footer }
         </div>
 
         <div className={styles.colSide}>
-          <Card title="Imagen">
-            <ImagePicker
-              value={v.image}
-              onChange={(blob) => {
-                set('image', blob);
-                setImageChanged(true);
-              }}
-            />
-          </Card>
           {costs.length > 0 && (
             <Card title="Costos históricos">
               <ul className={styles.costs}>

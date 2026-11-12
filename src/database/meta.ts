@@ -26,3 +26,6 @@ export async function getDeviceId(): Promise<string> {
 
 export const getCurrentStoreId = () => getMeta<string>(CURRENT_STORE);
 export const setCurrentStoreId = (id: string) => setMeta(CURRENT_STORE, id);
+
+/** Sólo lectura (sirve dentro de useLiveQuery). undefined si el dispositivo todavía no tiene id. */
+export const peekDeviceId = () => getMeta<string>(DEVICE_ID);

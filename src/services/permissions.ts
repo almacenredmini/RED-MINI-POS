@@ -5,6 +5,8 @@ export const PERMISSIONS = [
   { key: 'sales.discount', label: 'Aplicar descuentos', group: 'Ventas' },
   { key: 'sales.void', label: 'Ver historial y anular ventas', group: 'Ventas' },
   { key: 'accounts.manage', label: 'Administrar cuentas de empleados', group: 'Ventas' },
+  { key: 'cash.withdraw', label: 'Registrar retiros de caja', group: 'Caja' },
+  { key: 'cash.manage', label: 'Ver y cerrar cajas, y cambiar de usuario sin cerrar la caja', group: 'Caja' },
   { key: 'products.edit', label: 'Crear y editar productos', group: 'Productos' },
   { key: 'products.edit_price', label: 'Modificar precios', group: 'Productos' },
   { key: 'products.view_cost', label: 'Ver costos y márgenes', group: 'Productos' },
@@ -19,12 +21,13 @@ export const PERMISSIONS = [
 export type PermissionKey = (typeof PERMISSIONS)[number]['key'];
 
 const ROLE_DEFAULTS: Record<Exclude<UserRole, 'owner'>, readonly PermissionKey[]> = {
-  employee: ['sales.create'],
+  employee: ['sales.create', 'cash.withdraw'],
   manager: [
     'sales.create',
     'sales.discount',
     'sales.void',
     'accounts.manage',
+    'cash.withdraw',
     'products.edit',
     'products.edit_price',
     'products.view_cost',

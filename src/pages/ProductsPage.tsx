@@ -16,6 +16,7 @@ import { Card, EmptyState } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Field';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ProductRow } from '@/components/products/ProductRow';
+import { CategoriesModal } from '@/components/products/CategoriesModal';
 import styles from './ProductsPage.module.css';
 
 export function ProductsPage() {
@@ -24,6 +25,7 @@ export function ProductsPage() {
   const { can } = useAuth();
   const [query, setQuery] = useState('');
   const [scanning, setScanning] = useState(false);
+  const [editingCategories, setEditingCategories] = useState(false);
   const q = useDebounce(query);
 
   const results = useLiveQuery(() => searchProducts(q, 200), [q]);
@@ -56,6 +58,7 @@ export function ProductsPage() {
         subtitle={`${total} ${total === 1 ? 'producto' : 'productos'} en el catálogo`}
         actions={
           <>
+            <Button onClick={() => setEditingCategories(true)}>Categorías</Button>
             <Button icon="scan" onClick={() => setScanning(true)}>
               Escanear
             </Button>
@@ -104,6 +107,7 @@ export function ProductsPage() {
       </Card>
 
       <ScannerModal open={scanning} onClose={() => setScanning(false)} onDetected={(c) => void openByCode(c)} />
+      {editingCategories && <CategoriesModal onClose={() => setEditingCategories(false)} />}
     </>
   );
 }

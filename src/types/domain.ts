@@ -35,6 +35,8 @@ export interface Category extends SyncMeta {
   id: UUID;
   name: string;
   parent_id: UUID | null;
+  /** Comestible: si no rota, avisa para revisar vencimientos. Las categorías viejas no lo tienen (= no). */
+  perishable?: boolean;
 }
 
 export type ProductUnit = 'unit' | 'kg' | 'l';
@@ -110,7 +112,7 @@ export interface SyncQueueEntry {
   created_at: ISODate;
 }
 
-export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements';
+export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements';
 
 export type UserRole = 'owner' | 'manager' | 'employee';
 
@@ -210,10 +212,47 @@ export interface ProductCost {
 
 export type SaleStatus = 'completed' | 'voided';
 
+/**
+ * Caja de un dispositivo: la abre el primer cajero que vende y la cierra con "Salir".
+ * Hay una sola abierta por dispositivo; si el dueño vende mientras está abierta, entra en ella.
+ */
+export interface CashSession {
+  id: UUID;
+  store_id: UUID;
+  device_id: UUID;
+  opened_by: UUID | null;
+  opened_at: ISODate;
+  opening_cents: Cents;
+  closed_by: UUID | null;
+  closed_at: ISODate | null;
+  /** Efectivo que debía haber, calculado al cerrar. */
+  expected_cents: Cents | null;
+  counted_cents: Cents | null;
+  notes: string | null;
+  created_at: ISODate;
+  updated_at: ISODate;
+  version: number;
+  updated_by_device: UUID;
+}
+
+/** Retiro (o ingreso) de efectivo durante el turno. Inmutable. */
+export interface CashMovement {
+  id: UUID;
+  cash_session_id: UUID;
+  type: 'deposit' | 'withdrawal';
+  amount_cents: Cents;
+  reason: string;
+  user_id: UUID | null;
+  device_id: UUID;
+  occurred_at: ISODate;
+}
+
 export interface Sale {
   id: UUID;
   store_id: UUID;
   device_id: UUID;
+  /** Caja del dispositivo en la que entró la venta. Las ventas anteriores a la Etapa 5 no tienen. */
+  cash_session_id?: UUID | null;
   user_id: UUID | null;
   number: string;
   status: SaleStatus;

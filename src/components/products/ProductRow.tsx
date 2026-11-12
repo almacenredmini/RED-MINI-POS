@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { formatMoney, marginPct } from '@/services/money';
 import type { Product } from '@/types/domain';
-import { ProductThumb } from './ProductThumb';
 import styles from './ProductRow.module.css';
 
 interface Props {
@@ -19,7 +18,6 @@ export function ProductRow({ product: p, categoryName, stock, showMargin, minSto
 
   return (
     <Link to={`/productos/${p.id}`} className={styles.row}>
-      <ProductThumb productId={p.id} hasImage={p.has_image} />
       <div className={styles.main}>
         <span className={styles.name}>{p.name}</span>
         <span className={styles.meta}>{categoryName ?? 'Sin categoría'}</span>

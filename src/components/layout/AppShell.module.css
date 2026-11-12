@@ -168,7 +168,7 @@
 }
 
 /* Pantallas de PC angostas: Reportes, Usuarios y Ajustes pasan al menú "Más". */
-@media (min-width: 900px) and (max-width: 1339px) {
+@media (min-width: 900px) and (max-width: 1439px) {
   .secondaryButton {
     display: none;
   }

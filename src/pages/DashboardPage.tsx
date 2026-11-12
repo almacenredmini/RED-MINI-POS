@@ -2,6 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/database/db';
 import { effectiveMinStock, getAutoMinMap } from '@/database/repositories/minStock';
 import { daySummary } from '@/database/repositories/sales';
+import { slowMovers } from '@/database/repositories/reports';
+import { idleText } from '@/components/reports/SlowMovers';
 import { getStockMap } from '@/database/repositories/stores';
 import { useCurrentStore } from '@/contexts/DeviceContext';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -33,6 +35,8 @@ export function DashboardPage() {
   const pending = usePendingSyncCount();
   const productCount = useLiveQuery(() => db.products.filter((p) => !p.deleted_at).count(), [], 0);
   const lowStock = useLowStock(store.id);
+  // Comestibles con stock que no se vendieron en 30 días: puede haber mercadería por vencer.
+  const stale = useLiveQuery(async () => (await slowMovers(store.id, 30, 0)).filter((m) => m.perishable), [store.id], []);
   const day = useLiveQuery(() => daySummary(store.id), [store.id], { tickets: 0, total: 0, cash: 0, card: 0, transfer: 0, account: 0 });
 
   const today = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -65,6 +69,25 @@ export function DashboardPage() {
             </ul>
           )}
         </Card>
+
+        {stale.length > 0 && (
+          <Card title="Revisá vencimientos" action={<Badge tone="warning">{stale.length}</Badge>}>
+            <p className="muted">Comestibles con stock que no se venden hace 30 días o más.</p>
+            <ul className={styles.alerts}>
+              {stale.slice(0, 8).map((m) => (
+                <li key={m.productId}>
+                  <span>{m.name}</span>
+                  <Badge tone="warning">{idleText(m)}</Badge>
+                </li>
+              ))}
+            </ul>
+            {stale.length > 8 && (
+              <ButtonLink to="/reportes" size="sm">
+                Ver todos en Reportes
+              </ButtonLink>
+            )}
+          </Card>
+        )}
 
         <Card title="Sincronización">
           <dl className={styles.sync}>

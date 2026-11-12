@@ -125,3 +125,19 @@ El servidor es un buzón y un respaldo: cada dispositivo sigue funcionando solo.
 - **Alcance:** la PC de un local baja el catálogo y sólo lo de su sucursal, y por eso no puede cambiar de sucursal. El celular del dueño baja todo.
 - **Proveedor:** `SyncTransport` es lo único que conoce el motor. Se usa `fetch` directo, sin el SDK de Supabase.
 - **Pruebas:** las migraciones y las funciones se ejecutan contra PostgreSQL real (PGlite) en `sync.test.ts`. La autenticación de Supabase está simulada.
+
+## 21. Caja por cajero
+
+Una caja por dispositivo (`cash_sessions`), como en el servidor: el cajón de efectivo es físico.
+
+- **Apertura:** la abre sola la primera venta, en $0, a nombre de quien vende. Así nunca se rechaza una venta por no tener caja.
+- **Cierre:** "Salir" de quien la abrió pide el efectivo contado, sin mostrar el esperado. Se guardan esperado y contado en el mismo momento. El cajero sólo ve si hay diferencia; quien tiene `cash.manage` ve los montos. No hay segundo conteo.
+- **Esperado:** efectivo cobrado (sin vuelto) de las ventas no anuladas de la caja, más ingresos, menos retiros (`cash_movements`, inmutables).
+- **Dueño:** con `cash.manage` puede "Cambiar usuario" sin cerrar la caja. Lo que vende mientras tanto entra en la caja abierta, con su usuario en la venta. Sin ese permiso no se puede entrar mientras la caja de otro está abierta.
+- **Sesión:** queda abierta en el dispositivo hasta "Salir" (sólo el id del usuario en `localStorage`).
+
+## 22. Reportes y poca rotación
+
+Se calculan en el dispositivo con su base local, así que funcionan sin Internet y ven lo que el dispositivo tiene: la PC su sucursal, el celular del dueño todas. La ganancia usa el costo guardado en cada ítem al vender; el descuento general se reparte entre los ítems en proporción.
+
+Poca rotación: productos con stock que vendieron N unidades o menos en el período. Lo recién cargado sin ventas queda afuera hasta cumplir el período. Las categorías marcadas como comestibles (`categories.perishable`) avisan en Inicio cuando sus productos llevan 30 días sin venderse, para revisar vencimientos.

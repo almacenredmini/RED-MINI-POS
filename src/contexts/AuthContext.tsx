@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useDevice } from '@/contexts/DeviceContext';
 import { db } from '@/database/db';
 import { authenticate } from '@/database/repositories/users';
+import { getOpenSession } from '@/database/repositories/cash';
 import { seedAdminIfEmpty } from '@/database/seed';
 import { hasPermission, type PermissionKey } from '@/services/permissions';
 import { getSyncConfig } from '@/services/sync/config';
@@ -14,7 +15,8 @@ interface AuthState {
   restoring: boolean;
   /** El navegador no ofrece WebCrypto: la app se abrió por HTTP y no se puede validar contraseñas. */
   insecure: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  /** null si entró; si no, el motivo para mostrar. */
+  login: (username: string, password: string) => Promise<string | null>;
   logout: () => void;
   can: (key: PermissionKey) => boolean;
   canSwitchStore: boolean;
@@ -80,12 +82,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (username: string, password: string) => {
     const found = await authenticate(username, password);
-    if (found) {
-      writeSession(found.id);
-      setUserId(found.id);
-      setUser(found);
+    if (!found) return 'Usuario o contraseña incorrectos';
+    // Con la caja de otro cajero abierta sólo puede entrar quien administra cajas (el dueño):
+    // el cajero que llega tiene que esperar a que el anterior cuente y toque "Salir".
+    const open = await getOpenSession();
+    if (open && open.opened_by !== found.id && !hasPermission(found, 'cash.manage')) {
+      const holder = open.opened_by ? (await db.users.get(open.opened_by))?.name : undefined;
+      return `La caja de ${holder ?? 'otro usuario'} está abierta en este dispositivo. Tiene que entrar y tocar "Salir" para cerrarla, o pedile al dueño que la cierre.`;
     }
-    return found !== null;
+    writeSession(found.id);
+    setUserId(found.id);
+    setUser(found);
+    return null;
   }, []);
 
   const logout = useCallback(() => {

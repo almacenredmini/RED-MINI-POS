@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { getDeviceId } from '../meta';
-import { enqueue, newMeta } from '../outbox';
+import { enqueue, newMeta, touchMeta } from '../outbox';
 import { uuidv7 } from '@/services/id';
 import { normalize } from '@/services/search';
 import type { Category } from '@/types/domain';
@@ -24,5 +24,17 @@ export async function ensureCategory(name: string): Promise<Category> {
     await db.categories.add(category);
     await enqueue('categories', category.id, 'upsert', category);
     return category;
+  });
+}
+
+/** Marca la categoría como comestible o no. */
+export async function setCategoryPerishable(id: string, perishable: boolean): Promise<void> {
+  const deviceId = await getDeviceId();
+  await db.transaction('rw', db.categories, db.sync_queue, async () => {
+    const current = await db.categories.get(id);
+    if (!current || (current.perishable ?? false) === perishable) return;
+    const next = touchMeta({ ...current, perishable }, deviceId);
+    await db.categories.put(next);
+    await enqueue('categories', id, 'upsert', next);
   });
 }

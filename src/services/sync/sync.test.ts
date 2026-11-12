@@ -4,6 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/database/db';
 import { getDeviceId, setMeta } from '@/database/meta';
 import { listAccounts, saveAccount } from '@/database/repositories/accounts';
+import { addCashMovement, cashSummary, closeSession, getOpenSession } from '@/database/repositories/cash';
 import { registerManualMovement } from '@/database/repositories/inventory';
 import { findProductByBarcode, saveProduct, type ProductInput } from '@/database/repositories/products';
 import { cancelPurchase, savePurchase } from '@/database/repositories/purchases';
@@ -407,6 +408,35 @@ describe('alcance por sucursal', () => {
 });
 
 describe('otras operaciones', () => {
+  it('la caja, sus retiros y el cierre llegan al servidor y a los demás dispositivos', async () => {
+    const p = await saveProduct(base);
+    await sell(p.id, 2, ORO);
+    const first = (await getOpenSession())!;
+    await addCashMovement({ sessionId: first.id, type: 'withdrawal', amount: 500, reason: 'Proveedor', userId: null });
+    await sync();
+    await closeSession(first.id, 3000, null);
+    const { sale } = await sell(p.id, 1, ORO);
+    await sync();
+    expect(await queueByStatus('error')).toBe(0);
+    expect(await db.sync_queue.count()).toBe(0);
+
+    const server = await pg.query<{ id: string; expected_cents: string | null; closed_at: string | null }>('select id, expected_cents, closed_at from cash_sessions order by opened_at');
+    expect(server.rows).toHaveLength(2);
+    expect(Number(server.rows[0]?.expected_cents)).toBe(3500);
+    expect(server.rows[1]?.closed_at).toBeNull();
+    const linked = await pg.query<{ cash_session_id: string }>('select cash_session_id from sales where id = $1', [sale.id]);
+    expect(linked.rows[0]?.cash_session_id).toBe(server.rows[1]?.id);
+
+    await newDevice();
+    await sync(ORO.id);
+    const remote = (await cashSummary(first.id))!;
+    expect(remote.session.counted_cents).toBe(3000);
+    expect(remote.withdrawals).toBe(500);
+    expect(remote.tickets).toBe(1);
+    // La caja de otro dispositivo no es la caja abierta de este.
+    expect(await getOpenSession()).toBeUndefined();
+  });
+
   it('anular una venta en un dispositivo llega a los demás', async () => {
     const p = await saveProduct(base);
     const { sale } = await sell(p.id, 2, ORO);

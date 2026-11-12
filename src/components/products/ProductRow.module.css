@@ -1,6 +1,6 @@
 .row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: 14px;
   padding: 10px 14px;
@@ -60,7 +60,7 @@
 
 @media (min-width: 700px) {
   .row {
-    grid-template-columns: auto 1fr 90px 90px 140px;
+    grid-template-columns: 1fr 90px 90px 140px;
   }
 
   .col {

@@ -6,9 +6,10 @@ import { nowISO, uuidv7 } from '@/services/id';
 import type { PaymentDraft } from '@/services/payment';
 import type { Payment, Sale, SaleItem, Store } from '@/types/domain';
 import { chargeAccount, reverseCharge } from './accounts';
+import { ensureOpenSession } from './cash';
 import { applyStockMovement } from './stock';
 
-const TABLES = [db.sales, db.sale_items, db.payments, db.stock_movements, db.stock, db.meta, db.sync_queue, db.employee_accounts, db.account_movements];
+const TABLES = [db.sales, db.sale_items, db.payments, db.stock_movements, db.stock, db.meta, db.sync_queue, db.employee_accounts, db.account_movements, db.cash_sessions];
 
 export interface NewSale {
   /** Generado al abrir el cobro: un doble F1/F2 no puede duplicar la venta porque el id ya existe. */
@@ -44,11 +45,14 @@ export async function createSale({ id, store, userId, cart, payments }: NewSale)
     const seqKey = `sale_seq:${store.id}`;
     const seq = ((await getMeta<number>(seqKey)) ?? 0) + 1;
     await setMeta(seqKey, seq);
+    // La primera venta abre la caja: nunca se rechaza una venta por no tener caja abierta.
+    const cash = await ensureOpenSession(store.id, userId, deviceId);
 
     const sale: Sale = {
       id,
       store_id: store.id,
       device_id: deviceId,
+      cash_session_id: cash.id,
       user_id: userId,
       number: saleNumber(store.code, deviceId, seq),
       status: 'completed',

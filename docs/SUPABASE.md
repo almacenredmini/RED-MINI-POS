@@ -14,6 +14,10 @@ Se hace una sola vez. El plan gratuito alcanza.
 2. Pegá todo el contenido de `supabase/setup.sql` y tocá **Run**.
 3. Tiene que terminar sin errores.
 
+### Actualizar un proyecto que ya existe
+
+Cuando una versión nueva trae una migración (por ejemplo `supabase/migrations/0012_cash.sql`, de la Etapa 5), pegá sólo ese archivo en **SQL Editor → New query** y tocá **Run**, antes de tocar "Actualizar" en los dispositivos. Las migraciones son compatibles con la versión anterior de la app.
+
 ## 3. Crear la cuenta de sincronización
 
 1. Abrí **Authentication → Users** y tocá **Add user → Create new user**.

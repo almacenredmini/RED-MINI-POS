@@ -20,8 +20,9 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      if (!(await login(username, password))) {
-        setError('Usuario o contraseña incorrectos');
+      const problem = await login(username, password);
+      if (problem) {
+        setError(problem);
         setPassword('');
       }
     } catch {

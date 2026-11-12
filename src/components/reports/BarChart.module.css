@@ -1,0 +1,117 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plot {
+  display: flex;
+  align-items: flex-end;
+  /* 2px de separación entre barras, del color de la superficie. */
+  gap: 2px;
+  height: 180px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.slot {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  min-width: 0;
+  outline: none;
+  cursor: default;
+}
+
+.bar {
+  width: 100%;
+  min-height: 0;
+  max-width: 48px;
+  margin: 0 auto;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+  opacity: 0.85;
+}
+
+.slot:hover .bar,
+.slot:focus-visible .bar {
+  opacity: 1;
+}
+
+.slot:hover {
+  background: var(--surface-hover);
+}
+
+.tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 5;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.slot:hover .tip,
+.slot:focus-visible .tip {
+  display: flex;
+}
+
+.slot:first-child .tip {
+  left: 0;
+  transform: none;
+}
+
+.slot:last-child .tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.axis {
+  display: flex;
+  gap: 2px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.axis span {
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.table summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.table table {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.table td {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.table td:last-child {
+  text-align: right;
+}

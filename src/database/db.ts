@@ -1,6 +1,8 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type {
   AccountMovement,
+  CashMovement,
+  CashSession,
   Barcode,
   Category,
   EmployeeAccount,
@@ -52,6 +54,8 @@ export class RedMiniDB extends Dexie {
   product_cost_history!: EntityTable<ProductCost, 'id'>;
   employee_accounts!: EntityTable<EmployeeAccount, 'id'>;
   account_movements!: EntityTable<AccountMovement, 'id'>;
+  cash_sessions!: EntityTable<CashSession, 'id'>;
+  cash_movements!: EntityTable<CashMovement, 'id'>;
 
   constructor(name = 'red-mini-pos') {
     super(name);
@@ -93,6 +97,11 @@ export class RedMiniDB extends Dexie {
     this.version(5).stores({
       employee_accounts: 'id, name, updated_at',
       account_movements: 'id, account_id, sale_id, occurred_at',
+    });
+    this.version(6).stores({
+      sales: 'id, &number, [store_id+occurred_at], occurred_at, status, cash_session_id',
+      cash_sessions: 'id, device_id, [store_id+opened_at], opened_at',
+      cash_movements: 'id, cash_session_id',
     });
   }
 }
