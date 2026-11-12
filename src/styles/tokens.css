@@ -37,13 +37,21 @@
   --shadow-lg: 0 20px 50px rgb(0 0 0 / 0.5);
   --ring: 0 0 0 3px rgb(245 196 0 / 0.35);
 
-  --sidebar-w: 248px;
   --topbar-h: 64px;
+  --menubar-h: 56px;
   --bottomnav-h: 64px;
+  /* Alto del encabezado fijo: lo usan los elementos que se quedan pegados debajo al hacer scroll. */
+  --header-h: calc(var(--topbar-h) + env(safe-area-inset-top));
 
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   color-scheme: dark;
+}
+
+@media (min-width: 900px) {
+  :root {
+    --header-h: calc(var(--topbar-h) + var(--menubar-h));
+  }
 }
 
 :root[data-theme='light'] {

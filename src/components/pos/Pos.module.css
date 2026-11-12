@@ -62,7 +62,7 @@
 
   .summary {
     position: sticky;
-    top: 16px;
+    top: calc(var(--header-h) + 16px);
     inset: auto;
     gap: 10px;
     padding: 20px;

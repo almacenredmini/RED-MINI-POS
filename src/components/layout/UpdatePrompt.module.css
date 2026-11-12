@@ -1,7 +1,7 @@
 .bar {
   position: fixed;
   z-index: 90;
-  top: calc(var(--topbar-h) + 12px + env(safe-area-inset-top));
+  top: calc(var(--header-h) + 12px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -24,6 +24,6 @@
 
 @media (min-width: 900px) {
   .bar {
-    top: 16px;
+    top: calc(var(--header-h) + 12px);
   }
 }
