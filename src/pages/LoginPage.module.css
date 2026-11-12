@@ -24,3 +24,7 @@
   color: var(--danger);
   font-weight: 500;
 }
+
+.secret input {
+  -webkit-text-security: disc;
+}

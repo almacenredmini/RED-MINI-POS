@@ -70,7 +70,7 @@ Se solicita `navigator.storage.persist()` al iniciar: sin eso el navegador puede
 
 ## 12. Login local con PBKDF2
 
-Se pide usuario al cargar la página, incluso sin Internet, así que la validación ocurre en el dispositivo: la contraseña se guarda como hash PBKDF2 con sal, nunca en claro, y la sesión vive sólo en memoria.
+El usuario se valida incluso sin Internet, así que la validación ocurre en el dispositivo: la contraseña se guarda como hash PBKDF2 con sal, nunca en claro, y la sesión queda abierta en el dispositivo (sólo el id del usuario en localStorage) hasta que se toca "Salir"; si el usuario se desactiva, se cierra sola. El campo de contraseña no es de tipo password, para que el navegador no ofrezca guardarla en una PC compartida.
 
 Límite conocido: esto ordena quién hace qué en el mostrador, pero no protege contra alguien con acceso técnico al navegador, que puede leer IndexedDB. La protección real de los datos en el servidor llega en la Etapa 4 con Supabase Auth y RLS.
 

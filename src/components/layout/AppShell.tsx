@@ -16,7 +16,7 @@ import { NAV_ITEMS, type NavItem } from './navigation';
 import styles from './AppShell.module.css';
 
 export function AppShell() {
-  const { user, can, logout, canSwitchStore } = useAuth();
+  const { user, restoring, can, logout, canSwitchStore } = useAuth();
   const { stores, currentStore } = useDevice();
   const toast = useToast();
   const storeId = user ? currentStore?.id : undefined;
@@ -37,7 +37,7 @@ export function AppShell() {
     if (storeId) recalcMinStockIfNewWeek(storeId).catch(console.error);
   }, [storeId]);
 
-  if (!user) return <LoginPage />;
+  if (!user) return restoring ? <div className="boot"><Logo /></div> : <LoginPage />;
   if (user.store_id && currentStore?.id !== user.store_id) {
     // Hasta aplicar la sucursal fija no se muestra nada: una venta no puede caer en otra sucursal.
     if (stores.some((s) => s.id === user.store_id)) return <div className="boot"><Logo /></div>;

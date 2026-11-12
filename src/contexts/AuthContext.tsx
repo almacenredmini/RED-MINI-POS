@@ -10,6 +10,8 @@ import type { User } from '@/types/domain';
 
 interface AuthState {
   user: User | null;
+  /** Se está recuperando la sesión que quedó abierta en este dispositivo. */
+  restoring: boolean;
   /** El navegador no ofrece WebCrypto: la app se abrió por HTTP y no se puede validar contraseñas. */
   insecure: boolean;
   login: (username: string, password: string) => Promise<boolean>;
@@ -20,12 +22,32 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+const SESSION_KEY = 'redmini.session';
+
+/** Guarda sólo el id del usuario: la contraseña nunca queda en el dispositivo. */
+function readSession(): string | null {
+  try {
+    return localStorage.getItem(SESSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(userId: string | null) {
+  try {
+    if (userId) localStorage.setItem(SESSION_KEY, userId);
+    else localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // Sin almacenamiento la sesión dura hasta recargar, como antes.
+  }
+}
+
 /**
- * La sesión vive sólo en memoria: cada vez que se carga la página se vuelve a pedir usuario.
- * Lo que no se perdió por eso (el carrito en curso) está guardado aparte en la base local.
+ * La sesión queda abierta en este dispositivo hasta que el usuario toca "Salir",
+ * aunque se recargue la página o se cierre el navegador.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(readSession);
   const [user, setUser] = useState<User | null>(null);
   const [insecure, setInsecure] = useState(false);
   const { stores, currentStore, selectStore } = useDevice();
@@ -35,16 +57,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Si otro usuario le cambia los permisos o lo desactiva, se aplica al instante.
-  const live = useLiveQuery(() => (userId ? db.users.get(userId) : undefined), [userId]);
+  // null = el usuario ya no existe; undefined = todavía se está leyendo.
+  const live = useLiveQuery(async () => (userId ? ((await db.users.get(userId)) ?? null) : undefined), [userId]);
   useEffect(() => {
-    if (!live) return;
-    if (live.active) {
+    if (live === undefined) return;
+    if (live?.active) {
       setUser(live);
     } else {
+      writeSession(null);
       setUserId(null);
       setUser(null);
     }
   }, [live]);
+  const restoring = userId !== null && user === null;
 
   // Un usuario con sucursal fija siempre trabaja en esa, sin importar qué dejó elegido el anterior.
   const scopeStore = useLiveQuery(async () => (await getSyncConfig())?.scope_store_id ?? null, [], null);
@@ -56,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const found = await authenticate(username, password);
     if (found) {
+      writeSession(found.id);
       setUserId(found.id);
       setUser(found);
     }
@@ -63,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    writeSession(null);
     setUserId(null);
     setUser(null);
   }, []);
@@ -70,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const can = useCallback((key: PermissionKey) => (user ? hasPermission(user, key) : false), [user]);
 
   const canSwitchStore = user !== null && user.store_id === null && user.role !== 'employee' && scopeStore === null;
-  const value = useMemo(() => ({ user, insecure, login, logout, can, canSwitchStore }), [user, insecure, login, logout, can, canSwitchStore]);
+  const value = useMemo(() => ({ user, restoring, insecure, login, logout, can, canSwitchStore }), [user, restoring, insecure, login, logout, can, canSwitchStore]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
