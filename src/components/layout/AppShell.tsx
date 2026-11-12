@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, type NavLinkProps } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDevice } from '@/contexts/DeviceContext';
+import { useToast } from '@/contexts/ToastContext';
 import { recalcMinStockIfNewWeek } from '@/database/repositories/minStock';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/Card';
@@ -16,6 +17,7 @@ import styles from './AppShell.module.css';
 
 export function AppShell() {
   const { user, can, logout, canSwitchStore } = useAuth();
+  const toast = useToast();
   const { stores, currentStore } = useDevice();
   const storeId = user ? currentStore?.id : undefined;
 
@@ -33,39 +35,54 @@ export function AppShell() {
     return canSwitchStore ? <StorePicker /> : <EmptyState icon="alert" title="Tu usuario no tiene sucursal asignada. Avisale al dueño." />;
   }
 
-  const items = NAV_ITEMS.filter((i) => can(i.permission));
-  const mobileItems = items.filter((i) => i.mobile);
-  // Con una sola pantalla (el empleado) no hay nada que navegar: se oculta todo el menú.
-  const simple = items.length <= 1;
+  // Todos ven el menú completo, como pidió el dueño; lo que no pueden usar queda marcado y avisa al tocarlo.
+  const mobileItems = NAV_ITEMS.filter((i) => i.mobile);
+  const lockedProps = (allowed: boolean): Partial<NavLinkProps> =>
+    allowed
+      ? {}
+      : {
+          onClick: (e) => {
+            e.preventDefault();
+            toast('No tenés permiso para entrar a esa pantalla', 'error');
+          },
+          'aria-disabled': true,
+        };
 
   return (
-    <div className={`${styles.shell} ${simple ? styles.simple : ''}`}>
-      {!simple && (
-        <aside className={styles.sidebar}>
-          <div className={styles.sidebarBrand}>
-            <Logo />
-          </div>
-          <nav className={styles.nav}>
-            {items.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}>
+    <div className={styles.shell}>
+      <aside className={styles.sidebar}>
+        <div className={styles.sidebarBrand}>
+          <Logo />
+        </div>
+        <nav className={styles.nav}>
+          {NAV_ITEMS.map((item) => {
+            const allowed = can(item.permission);
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/'}
+                className={({ isActive }) => `${styles.link} ${isActive && allowed ? styles.active : ''} ${allowed ? '' : styles.locked}`}
+                {...lockedProps(allowed)}
+              >
                 <Icon name={item.icon} />
                 <span>{item.label}</span>
-                {item.stage && <span className={styles.stage}>E{item.stage}</span>}
+                {!allowed ? <Icon name="lock" size={14} className={styles.lockIcon} /> : item.stage && <span className={styles.stage}>E{item.stage}</span>}
               </NavLink>
-            ))}
-          </nav>
-          <div className={styles.sidebarFoot}>
-            <StoreSwitcher />
-            <SyncIndicator />
-            <div className={styles.userRow}>
-              <span>{user.name}</span>
-              <Button size="sm" variant="ghost" onClick={logout}>
-                Salir
-              </Button>
-            </div>
+            );
+          })}
+        </nav>
+        <div className={styles.sidebarFoot}>
+          <StoreSwitcher />
+          <SyncIndicator />
+          <div className={styles.userRow}>
+            <span>{user.name}</span>
+            <Button size="sm" variant="ghost" onClick={logout}>
+              Salir
+            </Button>
           </div>
-        </aside>
-      )}
+        </div>
+      </aside>
 
       <header className={styles.topbar}>
         <Logo />
@@ -83,21 +100,25 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      {!simple && (
-        <nav className={styles.bottomnav} style={{ gridTemplateColumns: `repeat(${mobileItems.length}, 1fr)` }}>
-          {mobileItems.map((item) => (
+      <nav className={styles.bottomnav} style={{ gridTemplateColumns: `repeat(${mobileItems.length}, 1fr)` }}>
+        {mobileItems.map((item) => {
+          const allowed = can(item.permission);
+          return (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
-              className={({ isActive }) => `${styles.tab} ${item.to === '/escanear' ? styles.tabScan : ''} ${isActive ? styles.active : ''}`}
+              className={({ isActive }) =>
+                `${styles.tab} ${item.to === '/escanear' ? styles.tabScan : ''} ${isActive && allowed ? styles.active : ''} ${allowed ? '' : styles.locked}`
+              }
+              {...lockedProps(allowed)}
             >
               <Icon name={item.icon} size={item.to === '/escanear' ? 24 : 22} />
               <span>{item.label}</span>
             </NavLink>
-          ))}
-        </nav>
-      )}
+          );
+        })}
+      </nav>
 
     </div>
   );

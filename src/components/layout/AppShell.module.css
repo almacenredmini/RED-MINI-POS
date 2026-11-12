@@ -37,14 +37,6 @@
   margin: 0 auto;
 }
 
-.simple .main {
-  padding-bottom: 24px;
-}
-
-.simple {
-  --bottomnav-h: 0px;
-}
-
 .userName {
   display: none;
   font-size: 0.85rem;
@@ -123,15 +115,6 @@
   .topbar,
   .bottomnav {
     display: none;
-  }
-
-  /* El empleado no tiene sidebar: la barra superior es su único encabezado. */
-  .simple {
-    display: block;
-  }
-
-  .simple .topbar {
-    display: flex;
   }
 
   .sidebar {
@@ -252,4 +235,18 @@
   .topbarRight .storeSelect {
     max-width: 76px;
   }
+}
+
+/* Secciones sin permiso: se ven, pero apagadas y con candado. */
+.locked {
+  opacity: 0.45;
+}
+
+.locked:hover {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.lockIcon {
+  margin-left: auto;
 }

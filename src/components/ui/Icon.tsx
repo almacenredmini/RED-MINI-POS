@@ -23,6 +23,7 @@ const PATHS = {
   store: 'M3 9l1-5h16l1 5M3 9h18v11H3zM9 20v-6h6v6',
   keyboard: 'M2 6h20v12H2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10',
   check: 'M20 6L9 17l-5-5',
+  lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
 } as const;
 
 export type IconName = keyof typeof PATHS;
