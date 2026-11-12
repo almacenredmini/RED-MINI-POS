@@ -39,11 +39,3 @@ export function RequirePermission({ permission, children }: { permission: Permis
   const { can } = useAuth();
   return can(permission) ? <>{children}</> : <Denied />;
 }
-
-/** Inicio es el panel; quien no puede verlo (el cajero) entra directo a su primera pantalla permitida. */
-export function HomeRoute({ children }: { children: ReactNode }) {
-  const { can } = useAuth();
-  const target = useFirstAllowedRoute();
-  if (can('reports.view')) return <>{children}</>;
-  return target ? <Navigate to={target} replace /> : <NoAccess />;
-}

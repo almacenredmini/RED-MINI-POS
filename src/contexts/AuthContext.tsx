@@ -8,6 +8,7 @@ import { seedAdminIfEmpty } from '@/database/seed';
 import { hasPermission, type PermissionKey } from '@/services/permissions';
 import { getSyncConfig } from '@/services/sync/config';
 import type { User } from '@/types/domain';
+import { START_ROUTE } from '@/startOnPos';
 
 interface AuthState {
   user: User | null;
@@ -91,6 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return `La caja de ${holder ?? 'otro usuario'} está abierta en este dispositivo. Tiene que entrar y tocar "Salir" para cerrarla, o pedile al dueño que la cierre.`;
     }
     writeSession(found.id);
+    // Quien entra (también después de "Cambiar usuario") empieza en Vender.
+    window.location.hash = START_ROUTE;
     setUserId(found.id);
     setUser(found);
     return null;

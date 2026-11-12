@@ -1,7 +1,7 @@
 import { lazy } from 'react';
-import { createHashRouter } from 'react-router-dom';
+import { createHashRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
-import { HomeRoute, RequirePermission } from '@/components/layout/RequirePermission';
+import { RequirePermission } from '@/components/layout/RequirePermission';
 import { ButtonLink } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/Card';
 import { DashboardPage } from '@/pages/DashboardPage';
@@ -29,7 +29,9 @@ export const router = createHashRouter([
   {
     element: <AppShell />,
     children: [
-      { index: true, element: <HomeRoute><DashboardPage /></HomeRoute> },
+      // Todos arrancan en Vender; quien no puede vender va a su primera pantalla permitida.
+      { index: true, element: <Navigate to="/vender" replace /> },
+      { path: 'inicio', element: <RequirePermission permission="reports.view"><DashboardPage /></RequirePermission> },
       { path: 'productos', element: <RequirePermission permission="products.edit"><ProductsPage /></RequirePermission> },
       { path: 'productos/nuevo', element: <RequirePermission permission="products.edit"><ProductEditPage /></RequirePermission> },
       { path: 'productos/:id', element: <RequirePermission permission="products.edit"><ProductEditPage /></RequirePermission> },

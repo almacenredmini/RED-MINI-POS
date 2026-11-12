@@ -14,7 +14,7 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Inicio', icon: 'dashboard', permission: 'reports.view', mobile: true },
+  { to: '/inicio', label: 'Inicio', icon: 'dashboard', permission: 'reports.view', mobile: true },
   { to: '/vender', label: 'Vender', icon: 'pos', permission: 'sales.create', mobile: true },
   { to: '/caja', label: 'Caja', icon: 'cash', permission: 'sales.create' },
   { to: '/ventas', label: 'Ventas', icon: 'purchases', permission: 'sales.void' },
