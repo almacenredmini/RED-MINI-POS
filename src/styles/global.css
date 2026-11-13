@@ -61,6 +61,20 @@ textarea {
   color: inherit;
 }
 
+/* En el celular, el navegador agranda la página al tocar un campo con letra menor a 16px y queda con zoom. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 :focus-visible {
   outline: none;
   box-shadow: var(--ring);
