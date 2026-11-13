@@ -147,7 +147,20 @@ export function CashDetailModal({ sessionId, onClose }: { sessionId: string; onC
  * Cierre con conteo a ciegas: se pide el efectivo contado sin mostrar cuánto debería haber.
  * El cajero sólo ve si hay diferencia; quien tiene `cash.manage` ve los montos.
  */
-export function CloseCashModal({ session, onClosed, onCancel, exitAfter }: { session: CashSession; onClosed: () => void; onCancel: () => void; exitAfter?: boolean }) {
+export function CloseCashModal({
+  session,
+  onClosed,
+  onCancel,
+  exitAfter,
+  onHandOver,
+}: {
+  session: CashSession;
+  onClosed: () => void;
+  onCancel: () => void;
+  exitAfter?: boolean;
+  /** Sale sin cerrar la caja para que entre el dueño (sólo él o el mismo cajero pueden entrar después). */
+  onHandOver?: () => void;
+}) {
   const { user, can } = useAuth();
   const toast = useToast();
   const [text, setText] = useState('');
@@ -230,6 +243,14 @@ export function CloseCashModal({ session, onClosed, onCancel, exitAfter }: { ses
         </Field>
         <p className="muted">Revisalo bien antes de confirmar: el conteo no se puede repetir.</p>
       </form>
+      {onHandOver && (
+        <div className={styles.handOver}>
+          <p className="muted">¿Tiene que entrar el dueño un momento? Salí sin cerrar la caja: sólo el dueño o vos van a poder entrar.</p>
+          <Button size="sm" onClick={onHandOver}>
+            Dejar entrar al dueño
+          </Button>
+        </div>
+      )}
     </Modal>
   );
 }

@@ -37,6 +37,11 @@ export function ExitButton({ variant = 'ghost' }: { variant?: 'ghost' | 'seconda
         <CloseCashModal
           session={closing}
           exitAfter
+          // El cajero no puede "Cambiar usuario", pero sí dejarle el lugar al dueño sin cerrar su caja.
+          {...(canSwitch ? {} : { onHandOver: () => {
+            setClosing(null);
+            logout();
+          } })}
           onCancel={() => setClosing(null)}
           onClosed={() => {
             setClosing(null);
