@@ -28,6 +28,7 @@ const ROLE_DEFAULTS: Record<Exclude<UserRole, 'owner'>, readonly PermissionKey[]
     'sales.void',
     'accounts.manage',
     'cash.withdraw',
+    'cash.manage',
     'products.edit',
     'products.edit_price',
     'products.view_cost',

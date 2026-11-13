@@ -84,12 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const found = await authenticate(username, password);
     if (!found) return 'Usuario o contraseña incorrectos';
-    // Con la caja de otro cajero abierta sólo puede entrar quien administra cajas (el dueño):
+    // Con la caja de otro cajero abierta sólo puede entrar quien administra cajas (dueño y encargados):
     // el cajero que llega tiene que esperar a que el anterior cuente y toque "Salir".
     const open = await getOpenSession();
     if (open && open.opened_by !== found.id && !hasPermission(found, 'cash.manage')) {
       const holder = open.opened_by ? (await db.users.get(open.opened_by))?.name : undefined;
-      return `La caja de ${holder ?? 'otro usuario'} está abierta en este dispositivo. Tiene que entrar y tocar "Salir" para cerrarla, o pedile al dueño que la cierre.`;
+      return `La caja de ${holder ?? 'otro usuario'} está abierta en este dispositivo. Tiene que entrar y tocar "Salir" para cerrarla, o que entre un administrador o encargado.`;
     }
     writeSession(found.id);
     // Quien entra (también después de "Cambiar usuario") empieza en Vender.
