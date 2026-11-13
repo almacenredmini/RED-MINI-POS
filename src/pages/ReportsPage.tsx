@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDevice } from '@/contexts/DeviceContext';
-import { localDay, salesReport, stockValue, type Row, type SalesReport } from '@/database/repositories/reports';
+import { localDay, salesLines, salesReport, stockValue, type Row, type SalesReport } from '@/database/repositories/reports';
+import { useToast } from '@/contexts/ToastContext';
+import { Button } from '@/components/ui/Button';
+import { downloadCsv, pesos, toCsv } from '@/services/csv';
 import { BarChart, type Bar } from '@/components/reports/BarChart';
 import { SlowMoversCard } from '@/components/reports/SlowMovers';
 import { Card, StatCard } from '@/components/ui/Card';
@@ -10,7 +13,7 @@ import { Input, Select } from '@/components/ui/Field';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { formatMoney } from '@/services/money';
 import { PAYMENT_LABELS } from '@/services/payment';
-import type { Payment } from '@/types/domain';
+import type { Payment, PaymentMethod } from '@/types/domain';
 import styles from './ReportsPage.module.css';
 
 type Preset = 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'lastMonth' | 'custom';
@@ -65,6 +68,33 @@ export function ReportsPage() {
   const [storeId, setStoreId] = useState<string>(currentStore?.id ?? '');
   const [start, end] = presetRange(preset, from, to);
   const scope = storeId || null;
+  const toast = useToast();
+  const [exporting, setExporting] = useState(false);
+
+  // Una fila por producto vendido: en Excel se puede filtrar y armar tablas dinámicas.
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      const lines = await salesLines(scope, start.toISOString(), end.toISOString(), (m) => PAYMENT_LABELS[m as PaymentMethod] ?? m);
+      if (lines.length === 0) {
+        toast('No hay ventas en ese período', 'error');
+        return;
+      }
+      const header = ['Fecha', 'Hora', 'Ticket', 'Sucursal', 'Cajero', 'Medio de pago', 'Categoría', 'Producto', 'Cantidad', 'Precio unitario', 'Descuento', 'Total'];
+      if (showCost) header.push('Costo', 'Ganancia');
+      const rows = lines.map((l) => {
+        const row = [l.date, l.time, l.ticket, l.store, l.user, l.methods, l.category, l.product, l.quantity, pesos(l.unitPrice), pesos(l.discount), pesos(l.total)];
+        if (showCost) row.push(pesos(l.cost), pesos(l.total - l.cost));
+        return row;
+      });
+      const place = storeId ? (stores.find((s) => s.id === storeId)?.name ?? 'sucursal') : 'todas';
+      downloadCsv(`ventas-${place}-${localDay(start)}-a-${localDay(new Date(end.getTime() - 1))}.csv`.replace(/\s+/g, '-'), toCsv(header, rows));
+    } catch {
+      toast('No se pudo exportar', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const report = useLiveQuery(() => salesReport(scope, start.toISOString(), end.toISOString()), [scope, start.getTime(), end.getTime()]);
   const stock = useLiveQuery(() => (showCost ? stockValue(scope) : Promise.resolve([])), [scope, showCost], []);
@@ -72,7 +102,15 @@ export function ReportsPage() {
 
   return (
     <>
-      <PageHeader title="Reportes" subtitle={storeId ? `Sucursal ${stores.find((s) => s.id === storeId)?.name ?? ''}` : 'Todas las sucursales'} />
+      <PageHeader
+        title="Reportes"
+        subtitle={storeId ? `Sucursal ${stores.find((s) => s.id === storeId)?.name ?? ''}` : 'Todas las sucursales'}
+        actions={
+          <Button onClick={() => void exportExcel()} disabled={exporting}>
+            {exporting ? 'Exportando…' : 'Exportar a Excel'}
+          </Button>
+        }
+      />
 
       <div className={styles.filters}>
         <Select value={preset} onChange={(e) => setPreset(e.target.value as Preset)} aria-label="Período">

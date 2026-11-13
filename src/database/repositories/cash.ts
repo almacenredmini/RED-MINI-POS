@@ -159,6 +159,18 @@ export async function closeSession(sessionId: string, counted: number, userId: s
   });
 }
 
+/** Nota del cajero después de cerrar con diferencia (por qué cree que pasó). Vacía = sin nota. */
+export async function setCloseNote(sessionId: string, notes: string): Promise<void> {
+  const deviceId = await getDeviceId();
+  await db.transaction('rw', [db.cash_sessions, db.sync_queue], async () => {
+    const session = await db.cash_sessions.get(sessionId);
+    if (!session?.closed_at) throw new Error('La caja no está cerrada');
+    const updated: CashSession = { ...session, notes: notes.trim() || null, updated_at: nowISO(), version: session.version + 1, updated_by_device: deviceId };
+    await db.cash_sessions.put(updated);
+    await enqueue('cash_sessions', updated.id, 'upsert', updated);
+  });
+}
+
 /** Cajas de una sucursal (o de todas) abiertas en el período, de la más nueva a la más vieja. */
 export async function listSessions(storeId: string | null, from: string, to: string): Promise<CashSession[]> {
   const rows = storeId

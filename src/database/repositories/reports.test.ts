@@ -5,7 +5,7 @@ import { computePayment } from '@/services/payment';
 import { uuidv7 } from '@/services/id';
 import { ensureCategory, setCategoryPerishable } from './categories';
 import { saveProduct, type ProductInput } from './products';
-import { salesReport, slowMovers } from './reports';
+import { salesLines, salesReport, slowMovers } from './reports';
 import { createSale, voidSale } from './sales';
 import { applyStockMovement } from './stock';
 
@@ -64,6 +64,12 @@ describe('reportes de ventas', () => {
       ['Vino', 1, 500],
     ]);
     expect(r.byHour.reduce((t, h) => t + h.tickets, 0)).toBe(2);
+
+    const lines = await salesLines(store.id, from, to, (m) => m.toUpperCase());
+    expect(lines.map((l) => [l.product, l.quantity, l.total, l.cost, l.methods])).toEqual([
+      ['Fernet', 1, 1000, 600, 'CASH'],
+      ['Vino', 1, 500, 300, 'CARD'],
+    ]);
   });
 });
 

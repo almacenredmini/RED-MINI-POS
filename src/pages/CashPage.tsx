@@ -180,6 +180,7 @@ function CashHistory() {
                   <td className="num">{s.counted_cents !== null ? formatMoney(s.counted_cents) : ''}</td>
                   <td>
                     <DifferenceBadge value={difference(s)} />
+                    {s.notes && <div className="muted">Nota: {s.notes}</div>}
                   </td>
                 </tr>
               ))}

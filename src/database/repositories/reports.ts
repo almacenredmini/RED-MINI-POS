@@ -55,6 +55,71 @@ async function loadSales(storeId: string | null, from: string, to: string): Prom
     : db.sales.where('occurred_at').between(from, to, true, false).toArray();
 }
 
+/** Una fila por producto vendido, para exportar a Excel. */
+export interface SaleLine {
+  date: string;
+  time: string;
+  ticket: string;
+  store: string;
+  user: string;
+  methods: string;
+  category: string;
+  product: string;
+  quantity: number;
+  unitPrice: number;
+  /** Descuento del ítem más su parte del descuento general. */
+  discount: number;
+  total: number;
+  cost: number;
+}
+
+export async function salesLines(storeId: string | null, from: string, to: string, methodLabel: (m: string) => string): Promise<SaleLine[]> {
+  const sales = (await loadSales(storeId, from, to)).filter((s) => s.status === 'completed').sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+  const ids = sales.map((s) => s.id);
+  const [items, payments, products, categories, users, stores] = await Promise.all([
+    db.sale_items.where('sale_id').anyOf(ids).toArray(),
+    db.payments.where('sale_id').anyOf(ids).toArray(),
+    db.products.toArray(),
+    db.categories.toArray(),
+    db.users.toArray(),
+    db.stores.toArray(),
+  ]);
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const categoryName = new Map(categories.map((c) => [c.id, c.name]));
+  const userName = new Map(users.map((u) => [u.id, u.name]));
+  const storeName = new Map(stores.map((s) => [s.id, s.name]));
+  const methods = new Map<string, Set<string>>();
+  for (const p of payments) (methods.get(p.sale_id) ?? methods.set(p.sale_id, new Set()).get(p.sale_id)!).add(methodLabel(p.method));
+  const itemsBySale = new Map<string, typeof items>();
+  for (const i of items) (itemsBySale.get(i.sale_id) ?? itemsBySale.set(i.sale_id, []).get(i.sale_id)!).push(i);
+
+  const lines: SaleLine[] = [];
+  for (const s of sales) {
+    const when = new Date(s.occurred_at);
+    for (const i of (itemsBySale.get(s.id) ?? []).sort((a, b) => a.line - b.line)) {
+      const share = s.subtotal_cents > 0 ? Math.round((i.total_cents * s.discount_cents) / s.subtotal_cents) : 0;
+      const product = i.product_id ? productById.get(i.product_id) : undefined;
+      const cat = product?.category_id;
+      lines.push({
+        date: localDay(s.occurred_at),
+        time: when.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+        ticket: s.number,
+        store: storeName.get(s.store_id) ?? '',
+        user: s.user_id ? (userName.get(s.user_id) ?? 'Usuario borrado') : '',
+        methods: [...(methods.get(s.id) ?? [])].join(' + '),
+        category: cat ? (categoryName.get(cat) ?? '') : 'Sin categoría',
+        product: product?.name ?? i.description,
+        quantity: i.quantity,
+        unitPrice: i.unit_price_cents,
+        discount: i.discount_cents + share,
+        total: i.total_cents - share,
+        cost: Math.round(i.unit_cost_cents * i.quantity),
+      });
+    }
+  }
+  return lines;
+}
+
 export async function salesReport(storeId: string | null, from: string, to: string): Promise<SalesReport> {
   const all = await loadSales(storeId, from, to);
   const sales = all.filter((s) => s.status === 'completed');

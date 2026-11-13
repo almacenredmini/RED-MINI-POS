@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { db } from '@/database/db';
-import { addCashMovement, cashSummary, closeSession, type CashSummary, type CloseResult } from '@/database/repositories/cash';
+import { addCashMovement, cashSummary, closeSession, setCloseNote, type CashSummary, type CloseResult } from '@/database/repositories/cash';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Field, Input } from '@/components/ui/Field';
@@ -166,6 +166,19 @@ export function CloseCashModal({
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CloseResult | null>(null);
+  const [note, setNote] = useState('');
+
+  // Con diferencia, el cajero puede dejar una nota antes de salir.
+  const finish = async () => {
+    if (note.trim()) {
+      try {
+        await setCloseNote(session.id, note);
+      } catch {
+        toast('No se pudo guardar la nota', 'error');
+      }
+    }
+    onClosed();
+  };
   const counted = text.trim() === '' ? null : parseMoney(text);
   const detailed = can('cash.manage');
 
@@ -186,9 +199,9 @@ export function CloseCashModal({
       <Modal
         open
         title="Caja cerrada"
-        onClose={onClosed}
+        onClose={() => void finish()}
         footer={
-          <Button variant="primary" onClick={onClosed} data-autofocus>
+          <Button variant="primary" onClick={() => void finish()} {...(result.difference === 0 && { 'data-autofocus': true })}>
             {exitAfter ? 'Salir' : 'Listo'}
           </Button>
         }
@@ -197,7 +210,22 @@ export function CloseCashModal({
           {result.difference === 0 ? (
             <p className={styles.ok}>Caja cerrada. No hay diferencia.</p>
           ) : (
-            <p className={styles.bad}>Tenés una diferencia de caja.</p>
+            <>
+              <p className={styles.bad}>Tenés una diferencia de caja.</p>
+              <Field label="Nota (opcional)" hint="Si sabés por qué pasó, anotalo. Ej.: di mal un vuelto.">
+                {(id) => (
+                  <Input
+                    id={id}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && void finish()}
+                    maxLength={200}
+                    autoComplete="off"
+                    data-autofocus
+                  />
+                )}
+              </Field>
+            </>
           )}
           {detailed && (
             <dl className={styles.facts}>
