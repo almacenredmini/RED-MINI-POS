@@ -223,6 +223,66 @@
   color: var(--accent);
 }
 
+.tabButton {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+/* Menú "Más" del celular: una grilla de secciones arriba de la barra inferior. */
+.sheetBackdrop {
+  position: fixed;
+  z-index: 19;
+  inset: 0;
+  background: rgb(0 0 0 / 0.5);
+}
+
+.sheet {
+  position: absolute;
+  inset: auto 0 calc(var(--bottomnav-h) + env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 16px;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  border-radius: var(--radius-lg, 16px) var(--radius-lg, 16px) 0 0;
+}
+
+.sheetItem {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 76px;
+  padding: 8px 4px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.sheetItem.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.sheetItem .lockBadge {
+  top: 6px;
+  right: 6px;
+}
+
+@media (min-width: 900px) {
+  .sheetBackdrop {
+    display: none;
+  }
+}
+
 .tabScan svg {
   box-sizing: content-box;
   padding: 8px;

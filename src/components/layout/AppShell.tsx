@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, type MouseEvent } from 'react';
+import { Suspense, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { NavLink, Outlet, useLocation, type NavLinkProps } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDevice } from '@/contexts/DeviceContext';
@@ -22,6 +22,10 @@ export function AppShell() {
   const storeId = user ? currentStore?.id : undefined;
   const moreRef = useRef<HTMLDetailsElement>(null);
   const { pathname } = useLocation();
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  // El menú "Más" del celular se cierra al cambiar de pantalla.
+  useEffect(() => setSheetOpen(false), [pathname]);
 
   // El menú "Más" se cierra al tocar afuera.
   useEffect(() => {
@@ -73,6 +77,8 @@ export function AppShell() {
   );
 
   const mobileItems = NAV_ITEMS.filter((i) => i.mobile);
+  const sheetItems = NAV_ITEMS.filter((i) => !i.mobile);
+  const inSheet = sheetItems.some((i) => pathname.startsWith(i.to));
 
   return (
     <div className={styles.shell}>
@@ -106,13 +112,32 @@ export function AppShell() {
         </Suspense>
       </main>
 
-      <nav className={styles.bottomnav} style={{ gridTemplateColumns: `repeat(${mobileItems.length}, 1fr)` }}>
+      {/* Celular: todo lo que no entra en la barra inferior está en "Más". */}
+      {sheetOpen && (
+        <div className={styles.sheetBackdrop} onClick={() => setSheetOpen(false)}>
+          <nav className={styles.sheet} aria-label="Más secciones" onClick={(e) => e.stopPropagation()}>
+            {sheetItems.map((item) => (
+              <NavLink key={item.to} {...linkProps(item, (active) => `${styles.sheetItem} ${active ? styles.active : ''}`)}>
+                <Icon name={item.icon} size={22} />
+                <span>{item.label}</span>
+                {!can(item.permission) && <Icon name="lock" size={11} className={styles.lockBadge} />}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+      )}
+
+      <nav className={styles.bottomnav} style={{ gridTemplateColumns: `repeat(${mobileItems.length + 1}, 1fr)` }}>
         {mobileItems.map((item) => (
           <NavLink key={item.to} {...linkProps(item, (active) => `${styles.tab} ${item.to === '/escanear' ? styles.tabScan : ''} ${active ? styles.active : ''}`)}>
             <Icon name={item.icon} size={item.to === '/escanear' ? 24 : 22} />
             <span>{item.label}</span>
           </NavLink>
         ))}
+        <button type="button" className={`${styles.tab} ${styles.tabButton} ${sheetOpen || inSheet ? styles.active : ''}`} aria-expanded={sheetOpen} onClick={() => setSheetOpen((o) => !o)}>
+          <Icon name="menu" size={22} />
+          <span>Más</span>
+        </button>
       </nav>
     </div>
   );

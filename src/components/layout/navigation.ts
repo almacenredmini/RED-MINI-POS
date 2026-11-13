@@ -6,7 +6,7 @@ export interface NavItem {
   label: string;
   icon: IconName;
   permission: PermissionKey;
-  /** Visible en la barra inferior del celular. */
+  /** Visible en la barra inferior del celular; las demás quedan en su menú "Más". */
   mobile?: boolean;
   /** En una PC de pantalla angosta pasa al menú "Más". */
   secondary?: boolean;
@@ -25,5 +25,5 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/compras', label: 'Compras', icon: 'purchases', permission: 'purchases.manage' },
   { to: '/reportes', label: 'Reportes', icon: 'reports', permission: 'reports.view', secondary: true },
   { to: '/usuarios', label: 'Usuarios', icon: 'store', permission: 'users.manage', secondary: true },
-  { to: '/ajustes', label: 'Ajustes', icon: 'settings', permission: 'settings.manage', mobile: true, secondary: true },
+  { to: '/ajustes', label: 'Ajustes', icon: 'settings', permission: 'settings.manage', secondary: true },
 ];
