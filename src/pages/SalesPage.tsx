@@ -52,7 +52,7 @@ function SaleModal({ saleId, onClose }: { saleId: string; onClose: () => void })
               Anular
             </Button>
           )}
-          <Button icon="pos" onClick={() => printHtml(renderTicketHtml({ ...detail, storeName: store.name, cashier: cashier ?? null }))}>
+          <Button icon="pos" onClick={() => printHtml(renderTicketHtml({ ...detail, storeName: store.name, storeAddress: store.address, cashier: cashier ?? null }))}>
             Reimprimir
           </Button>
         </>

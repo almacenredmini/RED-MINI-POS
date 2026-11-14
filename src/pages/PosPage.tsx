@@ -107,7 +107,7 @@ export function PosPage() {
       // La impresión va después de guardar: si la impresora falla, la venta ya está registrada.
       if (print) {
         try {
-          printHtml(renderTicketHtml({ ...detail, storeName: store.name, cashier: user?.name ?? null }));
+          printHtml(renderTicketHtml({ ...detail, storeName: store.name, storeAddress: store.address, cashier: user?.name ?? null }));
         } catch {
           toast('La venta se guardó, pero no se pudo imprimir', 'error');
         }

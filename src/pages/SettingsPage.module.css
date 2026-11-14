@@ -34,3 +34,46 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+.help summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.help ol {
+  margin: 8px 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.help code {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+}
