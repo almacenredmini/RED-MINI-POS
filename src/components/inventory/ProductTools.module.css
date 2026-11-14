@@ -1,0 +1,128 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dayPicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.table {
+  padding: 0;
+  overflow: hidden;
+}
+
+.change {
+  display: grid;
+  gap: 4px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.change:last-child {
+  border-bottom: 0;
+}
+
+.changeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.changeHead strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fields {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.bulk {
+  display: grid;
+  gap: 14px;
+}
+
+.ruleRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.segmented {
+  display: flex;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+.segmented button {
+  flex: 1;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.pickList {
+  display: grid;
+  max-height: 46vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.pickAll,
+.pick {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.pickAll {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  grid-template-columns: auto 1fr;
+  background: var(--bg-elevated);
+  font-weight: 600;
+}
+
+.pickName {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pickList > p {
+  padding: 10px 12px;
+}
+
+.pick input,
+.pickAll input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}

@@ -4,6 +4,7 @@ import { enqueue, newMeta, touchMeta } from '../outbox';
 import { nowISO, uuidv7 } from '@/services/id';
 import { buildSearchWords, tokenize } from '@/services/search';
 import { recordCost } from './costs';
+import { logProductChange } from './productChanges';
 import { applyStockMovement } from './stock';
 import type { Barcode, Product, ProductUnit, UUID } from '@/types/domain';
 
@@ -21,6 +22,8 @@ export interface ProductInput {
   barcodes: string[];
   /** Entrada (+) o salida (-) de stock que se guarda junto con el producto. */
   stock_adjustment?: { store_id: UUID; user_id: UUID | null; quantity: number };
+  /** Quién hace el cambio (para el Reporte de movimientos). */
+  user_id?: UUID | null;
   /** undefined = sin cambios; null = quitar imagen; Blob = reemplazar. */
   image?: Blob | null;
 }
@@ -35,7 +38,7 @@ export class DuplicateBarcodeError extends Error {
   }
 }
 
-const TABLES = [db.products, db.barcodes, db.product_images, db.product_cost_history, db.stock, db.stock_movements, db.sync_queue] as const;
+const TABLES = [db.products, db.barcodes, db.product_images, db.product_cost_history, db.product_changes, db.stock, db.stock_movements, db.sync_queue] as const;
 
 export async function findProductByBarcode(code: string): Promise<Product | undefined> {
   const bc = await db.barcodes.where('code').equals(code.trim()).first();
@@ -117,7 +120,11 @@ export async function saveProduct(input: ProductInput, existingId?: string): Pro
     await db.products.put(product);
     await enqueue('products', id, 'upsert', toSyncProduct(product));
 
+    const oldCodes = previous ? (await getProductBarcodes(id)).map((b) => b.code).sort() : [];
     await syncBarcodes(id, codes, deviceId);
+    const newCodes = [...codes].sort();
+    const barcodeChange = previous && oldCodes.join(',') !== newCodes.join(',') ? { barcodes: [oldCodes.join(', '), newCodes.join(', ')] as [unknown, unknown] } : undefined;
+    await logProductChange(previous, product, { source: 'manual', userId: input.user_id ?? null, deviceId }, barcodeChange);
 
     if (previous ? previous.cost_cents !== input.cost_cents : input.cost_cents > 0) {
       await recordCost(id, input.cost_cents, deviceId);
@@ -173,7 +180,7 @@ async function syncBarcodes(productId: string, codes: string[], deviceId: string
   }
 }
 
-export async function deleteProduct(id: string): Promise<void> {
+export async function deleteProduct(id: string, userId: UUID | null = null): Promise<void> {
   const deviceId = await getDeviceId();
   await db.transaction('rw', TABLES, async () => {
     const p = await db.products.get(id);
@@ -182,6 +189,7 @@ export async function deleteProduct(id: string): Promise<void> {
     await db.products.put(removed);
     await enqueue('products', id, 'upsert', toSyncProduct(removed));
     await syncBarcodes(id, [], deviceId);
+    await logProductChange(p, removed, { source: 'manual', userId, deviceId });
   });
 }
 

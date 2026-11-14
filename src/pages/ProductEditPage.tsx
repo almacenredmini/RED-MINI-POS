@@ -100,6 +100,7 @@ export function ProductEditPage() {
       await saveProduct(
         {
           ...rest,
+          user_id: user?.id ?? null,
           ...(imageChanged && { image }),
           ...(stock_delta !== 0 && can('stock.adjust') && { stock_adjustment: { store_id: store.id, user_id: user?.id ?? null, quantity: stock_delta } }),
         },
@@ -116,7 +117,7 @@ export function ProductEditPage() {
 
   const onDelete = async () => {
     if (!id) return;
-    await deleteProduct(id);
+    await deleteProduct(id, user?.id ?? null);
     toast('Producto eliminado', 'success');
     navigate('/productos', { replace: true });
   };

@@ -25,7 +25,7 @@ describe('productos', () => {
   it('guarda y encola el cambio en la misma transacción', async () => {
     const p = await saveProduct(base);
     const queue = await db.sync_queue.toArray();
-    expect(queue.map((q) => q.table).sort()).toEqual(['barcodes', 'product_cost_history', 'products']);
+    expect(queue.map((q) => q.table).sort()).toEqual(['barcodes', 'product_changes', 'product_cost_history', 'products']);
     expect(queue.find((q) => q.table === 'products')?.record_id).toBe(p.id);
   });
 

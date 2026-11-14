@@ -8,6 +8,7 @@ import type {
   EmployeeAccount,
   MetaEntry,
   Product,
+  ProductChange,
   ProductCost,
   Payment,
   ProductImage,
@@ -52,6 +53,7 @@ export class RedMiniDB extends Dexie {
   purchase_items!: EntityTable<PurchaseItem, 'id'>;
   purchase_files!: EntityTable<PurchaseFile, 'purchase_id'>;
   product_cost_history!: EntityTable<ProductCost, 'id'>;
+  product_changes!: EntityTable<ProductChange, 'id'>;
   employee_accounts!: EntityTable<EmployeeAccount, 'id'>;
   account_movements!: EntityTable<AccountMovement, 'id'>;
   cash_sessions!: EntityTable<CashSession, 'id'>;
@@ -102,6 +104,9 @@ export class RedMiniDB extends Dexie {
       sales: 'id, &number, [store_id+occurred_at], occurred_at, status, cash_session_id',
       cash_sessions: 'id, device_id, [store_id+opened_at], opened_at',
       cash_movements: 'id, cash_session_id',
+    });
+    this.version(7).stores({
+      product_changes: 'id, occurred_at, product_id',
     });
   }
 }

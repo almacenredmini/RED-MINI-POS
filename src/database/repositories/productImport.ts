@@ -4,12 +4,13 @@ import { enqueueMany, newMeta, touchMeta } from '../outbox';
 import { nowISO, uuidv7 } from '@/services/id';
 import { buildSearchWords, normalize } from '@/services/search';
 import type { ImportRow } from '@/services/spreadsheet';
-import type { Barcode, Category, Product, ProductCost, StockMovement, UUID } from '@/types/domain';
+import type { Barcode, Category, Product, ProductChange, ProductCost, StockMovement, UUID } from '@/types/domain';
 import { newCostRow } from './costs';
+import { buildProductChange } from './productChanges';
 import { toSyncProduct } from './products';
 import { applyStockMovements } from './stock';
 
-const TABLES = [db.categories, db.products, db.barcodes, db.product_cost_history, db.stock, db.stock_movements, db.sync_queue];
+const TABLES = [db.categories, db.products, db.barcodes, db.product_cost_history, db.product_changes, db.stock, db.stock_movements, db.sync_queue];
 
 export type ImportAction = 'create' | 'update';
 
@@ -76,6 +77,7 @@ export async function importProducts(rows: ImportRow[], storeId: UUID, userId: U
     const barcodes: Barcode[] = [];
     const costs: ProductCost[] = [];
     const movements: StockMovement[] = [];
+    const changes: ProductChange[] = [];
 
     for (const row of valid) {
       const existing = resolve(row, catalog);
@@ -106,6 +108,13 @@ export async function importProducts(rows: ImportRow[], storeId: UUID, userId: U
             ...newMeta(deviceId),
           };
 
+      // Si el mismo producto aparece dos veces en el archivo, se compara con cómo estaba antes de importar.
+      const change = buildProductChange(existing, product, { source: 'import', userId, deviceId, occurredAt: now });
+      if (change) {
+        const i = changes.findIndex((c) => c.product_id === product.id);
+        if (i >= 0) changes.splice(i, 1);
+        changes.push(change);
+      }
       products.set(product.id, product);
       catalog.byId.set(product.id, product);
       if (existing) result.updated += 1;
@@ -159,11 +168,13 @@ export async function importProducts(rows: ImportRow[], storeId: UUID, userId: U
     await db.products.bulkPut([...products.values()]);
     await db.barcodes.bulkPut(barcodes);
     await db.product_cost_history.bulkAdd(costs);
+    await db.product_changes.bulkAdd(changes);
     await enqueueMany([
       ...newCategories.map((c) => ({ table: 'categories' as const, record_id: c.id, op: 'upsert' as const, payload: c })),
       ...[...products.values()].map((p) => ({ table: 'products' as const, record_id: p.id, op: 'upsert' as const, payload: toSyncProduct(p) })),
       ...barcodes.map((b) => ({ table: 'barcodes' as const, record_id: b.id, op: 'upsert' as const, payload: b })),
       ...costs.map((c) => ({ table: 'product_cost_history' as const, record_id: c.id, op: 'upsert' as const, payload: c })),
+      ...changes.map((c) => ({ table: 'product_changes' as const, record_id: c.id, op: 'upsert' as const, payload: c })),
     ]);
     await applyStockMovements(movements);
   });

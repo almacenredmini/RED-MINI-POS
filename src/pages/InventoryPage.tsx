@@ -8,7 +8,9 @@ import { effectiveMinStock, getAutoMinMap } from '@/database/repositories/minSto
 import { searchProducts } from '@/database/repositories/products';
 import { getStockMap } from '@/database/repositories/stores';
 import { useDebounce } from '@/hooks/useDebounce';
+import { BulkPriceModal } from '@/components/inventory/BulkPriceModal';
 import { ImportModal } from '@/components/inventory/ImportModal';
+import { ProductChangesTab } from '@/components/inventory/ProductChanges';
 import { MovementModal, type MovementMode } from '@/components/inventory/MovementModal';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -113,7 +115,8 @@ export function InventoryPage() {
   const store = useCurrentStore();
   const { stores } = useDevice();
   const { can } = useAuth();
-  const [tab, setTab] = useState<'stock' | 'history'>('stock');
+  const [tab, setTab] = useState<'stock' | 'history' | 'changes'>('stock');
+  const [pricing, setPricing] = useState(false);
   const [filter, setFilter] = useState<Product | null>(null);
   const [mode, setMode] = useState<MovementMode | null>(null);
   const [importing, setImporting] = useState(false);
@@ -129,6 +132,7 @@ export function InventoryPage() {
             <Button icon="minus" onClick={() => setMode('exit')}>Salida</Button>
             <Button icon="check" onClick={() => setMode('count')}>Conteo</Button>
             {can('stock.transfer') && stores.length > 1 && <Button icon="store" onClick={() => setMode('transfer')}>Transferir</Button>}
+            {can('products.edit_price') && <Button icon="cash" onClick={() => setPricing(true)}>Modificar precios</Button>}
             <Button variant="primary" icon="purchases" onClick={() => setImporting(true)}>Importar Excel</Button>
           </>
         }
@@ -140,8 +144,13 @@ export function InventoryPage() {
         <button type="button" role="tab" aria-selected={tab === 'history'} className={`${styles.tab} ${tab === 'history' ? styles.tabActive : ''}`} onClick={() => setTab('history')}>
           Historial
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'changes'} className={`${styles.tab} ${tab === 'changes' ? styles.tabActive : ''}`} onClick={() => setTab('changes')}>
+          Reporte de movimientos
+        </button>
       </div>
-      {tab === 'stock' ? (
+      {tab === 'changes' ? (
+        <ProductChangesTab />
+      ) : tab === 'stock' ? (
         <StockTab
           onProduct={(p) => {
             setFilter(p);
@@ -153,6 +162,7 @@ export function InventoryPage() {
       )}
       {mode && <MovementModal key={mode} mode={mode} onClose={() => setMode(null)} />}
       {importing && <ImportModal onClose={() => setImporting(false)} />}
+      {pricing && <BulkPriceModal onClose={() => setPricing(false)} />}
     </>
   );
 }

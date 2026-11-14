@@ -61,6 +61,25 @@ export interface Product extends SyncMeta {
   search_words: string[];
 }
 
+export type ProductChangeAction = 'created' | 'updated' | 'deleted';
+/** De dónde vino el cambio. */
+export type ProductChangeSource = 'manual' | 'import' | 'purchase' | 'bulk_price';
+
+/** Registro inmutable de altas, modificaciones y bajas de productos (Reporte de movimientos). */
+export interface ProductChange {
+  id: UUID;
+  product_id: UUID;
+  /** Nombre al momento del cambio: sigue legible aunque después lo renombren o borren. */
+  product_name: string;
+  action: ProductChangeAction;
+  /** Campo → [antes, después]. Vacío en altas y bajas. */
+  changes: Record<string, [unknown, unknown]>;
+  source: ProductChangeSource;
+  user_id: UUID | null;
+  device_id: UUID;
+  occurred_at: ISODate;
+}
+
 export interface Barcode extends SyncMeta {
   id: UUID;
   code: string;
@@ -112,7 +131,7 @@ export interface SyncQueueEntry {
   created_at: ISODate;
 }
 
-export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements';
+export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes';
 
 export type UserRole = 'owner' | 'manager' | 'employee';
 

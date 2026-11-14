@@ -4,10 +4,11 @@ import { enqueue, newMeta, touchMeta } from '../outbox';
 import { nowISO, uuidv7 } from '@/services/id';
 import type { InvoiceType, Purchase, PurchaseItem, UUID } from '@/types/domain';
 import { recordCost } from './costs';
+import { logProductChange } from './productChanges';
 import { toSyncProduct } from './products';
 import { applyStockMovement } from './stock';
 
-const TABLES = [db.purchases, db.purchase_items, db.purchase_files, db.products, db.product_cost_history, db.stock, db.stock_movements, db.sync_queue];
+const TABLES = [db.purchases, db.purchase_items, db.purchase_files, db.products, db.product_cost_history, db.product_changes, db.stock, db.stock_movements, db.sync_queue];
 
 export class PurchaseError extends Error {}
 
@@ -124,6 +125,7 @@ export async function savePurchase(input: PurchaseInput, opts: { id?: string | u
           const updated = { ...touchMeta(product, deviceId), cost_cents: l.unit_cost_cents };
           await db.products.put(updated);
           await enqueue('products', product.id, 'upsert', toSyncProduct(updated));
+          await logProductChange(product, updated, { source: 'purchase', userId: opts.userId, deviceId });
           await recordCost(product.id, l.unit_cost_cents, deviceId, { supplierId: input.supplier_id, purchaseId: id });
         }
       }
