@@ -1,0 +1,142 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.storeCard {
+  margin-bottom: 16px;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.table th,
+.table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.table th {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.table th.num,
+.table td.num {
+  text-align: right;
+}
+
+.table tfoot td {
+  border-bottom: 0;
+  font-weight: 700;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover td {
+  background: var(--surface);
+}
+
+.day {
+  font-size: 0.82rem;
+}
+
+.pay {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.days {
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.daysHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dayRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.dayName {
+  font-weight: 600;
+}
+
+.shifts {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.shift {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 72px auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.total {
+  margin-top: 8px;
+  text-align: right;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.confirm {
+  margin-right: auto;
+}
+
+@media (max-width: 420px) {
+  .shift {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  }
+
+  .shift > :nth-child(4) {
+    display: none;
+  }
+}

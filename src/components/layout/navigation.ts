@@ -24,6 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/inventario', label: 'Inventario', icon: 'inventory', permission: 'stock.adjust' },
   { to: '/compras', label: 'Compras', icon: 'purchases', permission: 'purchases.manage' },
   { to: '/reportes', label: 'Reportes', icon: 'reports', permission: 'reports.view', secondary: true },
+  { to: '/horarios', label: 'Horarios', icon: 'calendar', permission: 'schedules.manage', secondary: true },
   { to: '/usuarios', label: 'Usuarios', icon: 'store', permission: 'users.manage', secondary: true },
   { to: '/ajustes', label: 'Ajustes', icon: 'settings', permission: 'settings.manage', secondary: true },
 ];

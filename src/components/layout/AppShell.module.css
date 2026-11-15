@@ -154,7 +154,7 @@
     gap: 6px;
     height: var(--menubar-h);
     padding: 0 16px;
-    max-width: 1400px;
+    max-width: 1600px;
     margin: 0 auto;
   }
 
@@ -168,7 +168,7 @@
 }
 
 /* Pantallas de PC angostas: Reportes, Usuarios y Ajustes pasan al menú "Más". */
-@media (min-width: 900px) and (max-width: 1439px) {
+@media (min-width: 900px) and (max-width: 1599px) {
   .secondaryButton {
     display: none;
   }

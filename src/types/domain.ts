@@ -61,6 +61,28 @@ export interface Product extends SyncMeta {
   search_words: string[];
 }
 
+export type PayPeriod = 'weekly' | 'biweekly' | 'monthly';
+
+/** Un turno dentro de un día, en hora local "HH:MM". Si termina antes de empezar, cruza la medianoche. */
+export interface Shift {
+  start: string;
+  end: string;
+}
+
+/** Horario semanal de una persona en una sucursal. Se repite todas las semanas. */
+export interface StaffSchedule extends SyncMeta {
+  id: UUID;
+  store_id: UUID;
+  /** Usuario del sistema, si tiene; si no, sólo el nombre. */
+  user_id: UUID | null;
+  name: string;
+  /** Cómo cobra: define qué total se resalta. */
+  pay_period: PayPeriod;
+  /** De lunes (0) a domingo (6). */
+  days: Shift[][];
+  notes: string | null;
+}
+
 export type ProductChangeAction = 'created' | 'updated' | 'deleted';
 /** De dónde vino el cambio. */
 export type ProductChangeSource = 'manual' | 'import' | 'purchase' | 'bulk_price';
@@ -131,7 +153,7 @@ export interface SyncQueueEntry {
   created_at: ISODate;
 }
 
-export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes';
+export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules';
 
 export type UserRole = 'owner' | 'manager' | 'employee';
 
