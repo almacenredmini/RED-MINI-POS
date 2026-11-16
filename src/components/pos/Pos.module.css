@@ -20,8 +20,27 @@
 
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
+}
+
+/* Los botones se reparten todo el ancho: no queda un hueco a la derecha. */
+.toolbar > button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* En el celular: ícono arriba y texto abajo, así entran los cuatro en una fila. */
+@media (max-width: 600px) {
+  .toolbar > button {
+    flex-direction: column;
+    gap: 2px;
+    height: 58px;
+    padding: 0 4px;
+    font-size: 0.8rem;
+    line-height: 1.15;
+    white-space: normal;
+    text-align: center;
+  }
 }
 
 .summary {

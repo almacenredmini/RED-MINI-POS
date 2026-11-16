@@ -23,6 +23,14 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   min-width: 0;
+  /* El número se achica según el ancho de la tarjeta: en el celular entra el monto entero. */
+  container-type: inline-size;
+}
+
+@media (max-width: 520px) {
+  .stat {
+    padding: 14px;
+  }
 }
 
 .highlight {
@@ -48,12 +56,16 @@
 }
 
 .statValue {
-  font-size: 1.7rem;
+  font-size: clamp(1rem, 14.5cqi, 1.7rem);
   font-weight: 700;
   letter-spacing: -0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.statValue.long {
+  font-size: clamp(0.9rem, 12.5cqi, 1.5rem);
 }
 
 .statFoot {

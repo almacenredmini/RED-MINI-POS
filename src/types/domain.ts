@@ -122,6 +122,59 @@ export interface ScreenExit {
   seconds: number;
 }
 
+/**
+ * Devolución de un producto de un ticket. Inmutable: el ticket original no se toca.
+ * Resta de las ventas del día en que se devuelve y la plata sale de la caja donde se hizo.
+ */
+export interface SaleReturn {
+  id: UUID;
+  sale_id: UUID;
+  sale_item_id: UUID;
+  store_id: UUID;
+  cash_session_id: UUID;
+  /** null = producto común. */
+  product_id: UUID | null;
+  description: string;
+  quantity: number;
+  unit_price_cents: Cents;
+  unit_cost_cents: Cents;
+  /** Lo devuelto al cliente, con su parte del descuento general ya restada. */
+  total_cents: Cents;
+  /** `employee_account` sólo si el ticket se cobró entero a cuenta: baja la deuda en vez de dar efectivo. */
+  refund_method: 'cash' | 'employee_account';
+  account_id: UUID | null;
+  reason: string;
+  user_id: UUID | null;
+  device_id: UUID;
+  occurred_at: ISODate;
+}
+
+/** Planilla de pendientes de una sucursal: se repite todos los días. */
+export interface TaskTemplate extends SyncMeta {
+  id: UUID;
+  store_id: UUID;
+  title: string;
+  position: number;
+}
+
+/**
+ * Un pendiente de un día. Los de la planilla se crean recién cuando alguien los marca;
+ * los agregados sólo para ese día (`template_id` null) se crean al agregarlos.
+ */
+export interface DayTask extends SyncMeta {
+  id: UUID;
+  store_id: UUID;
+  /** `AAAA-MM-DD` en hora local. */
+  day: string;
+  template_id: UUID | null;
+  title: string;
+  created_by: UUID | null;
+  done_by: UUID | null;
+  /** Nombre al momento de marcarlo: sigue legible aunque después lo renombren. */
+  done_by_name: string | null;
+  done_at: ISODate | null;
+}
+
 export type ProductChangeAction = 'created' | 'updated' | 'deleted';
 /** De dónde vino el cambio. */
 export type ProductChangeSource = 'manual' | 'import' | 'purchase' | 'bulk_price';
@@ -192,7 +245,7 @@ export interface SyncQueueEntry {
   created_at: ISODate;
 }
 
-export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices' | 'screen_exits';
+export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices' | 'screen_exits' | 'sale_returns' | 'task_templates' | 'day_tasks';
 
 export type UserRole = 'owner' | 'manager' | 'employee';
 

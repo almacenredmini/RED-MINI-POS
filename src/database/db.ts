@@ -9,7 +9,7 @@ import type {
   MetaEntry,
   Product,
   ProductChange,
-  StaffSchedule, SupplierInvoice, ScreenExit,
+  StaffSchedule, SupplierInvoice, ScreenExit, SaleReturn, TaskTemplate, DayTask,
   ProductCost,
   Payment,
   ProductImage,
@@ -58,6 +58,9 @@ export class RedMiniDB extends Dexie {
   staff_schedules!: EntityTable<StaffSchedule, 'id'>;
   supplier_invoices!: EntityTable<SupplierInvoice, 'id'>;
   screen_exits!: EntityTable<ScreenExit, 'id'>;
+  sale_returns!: EntityTable<SaleReturn, 'id'>;
+  task_templates!: EntityTable<TaskTemplate, 'id'>;
+  day_tasks!: EntityTable<DayTask, 'id'>;
   employee_accounts!: EntityTable<EmployeeAccount, 'id'>;
   account_movements!: EntityTable<AccountMovement, 'id'>;
   cash_sessions!: EntityTable<CashSession, 'id'>;
@@ -120,6 +123,13 @@ export class RedMiniDB extends Dexie {
     });
     this.version(10).stores({
       screen_exits: 'id, left_at, store_id',
+    });
+    this.version(11).stores({
+      sale_returns: 'id, sale_id, sale_item_id, cash_session_id, occurred_at, [store_id+occurred_at]',
+    });
+    this.version(12).stores({
+      task_templates: 'id, store_id',
+      day_tasks: 'id, [store_id+day]',
     });
   }
 }

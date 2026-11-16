@@ -31,7 +31,10 @@ export function StatCard({ label, value, icon, foot, highlight }: StatProps) {
         <span className={styles.statLabel}>{label}</span>
         <Icon name={icon} size={18} />
       </div>
-      <div className={`${styles.statValue} num`}>{value}</div>
+      {/* Los montos largos (millones) se achican un poco más para que entren enteros. */}
+      <div className={[styles.statValue, 'num', typeof value === 'string' && value.length > 12 && styles.long].filter(Boolean).join(' ')} title={typeof value === 'string' ? value : undefined}>
+        {value}
+      </div>
       {foot && <div className={styles.statFoot}>{foot}</div>}
     </div>
   );

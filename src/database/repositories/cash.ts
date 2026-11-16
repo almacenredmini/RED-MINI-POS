@@ -66,6 +66,8 @@ export interface CashSummary {
   /** Ventas por usuario: así se ve lo que vendió el dueño en la caja del cajero. */
   byUser: { userId: string | null; tickets: number; total: number }[];
   voided: number;
+  /** Devoluciones hechas en esta caja. `cash` es lo que salió del cajón. */
+  returns: { count: number; total: number; cash: number };
 }
 
 export async function cashSummary(sessionId: string): Promise<CashSummary | null> {
@@ -74,6 +76,8 @@ export async function cashSummary(sessionId: string): Promise<CashSummary | null
   const sales = await db.sales.where('cash_session_id').equals(sessionId).toArray();
   const completed = sales.filter((s) => s.status === 'completed');
   const payments = await db.payments.where('sale_id').anyOf(completed.map((s) => s.id)).toArray();
+  const returns = await db.sale_returns.where('cash_session_id').equals(sessionId).toArray();
+  const refundedCash = returns.filter((r) => r.refund_method === 'cash').reduce((s, r) => s + r.total_cents, 0);
   const movements = (await db.cash_movements.where('cash_session_id').equals(sessionId).toArray()).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
 
   const byMethod: CashSummary['byMethod'] = {};
@@ -96,10 +100,11 @@ export async function cashSummary(sessionId: string): Promise<CashSummary | null
     byMethod,
     withdrawals,
     deposits,
-    expected: session.opening_cents + (byMethod.cash ?? 0) + deposits - withdrawals,
+    expected: session.opening_cents + (byMethod.cash ?? 0) - refundedCash + deposits - withdrawals,
     movements,
     byUser: [...users.values()].sort((a, b) => b.total - a.total),
     voided: sales.length - completed.length,
+    returns: { count: returns.length, total: returns.reduce((s, r) => s + r.total_cents, 0), cash: refundedCash },
   };
 }
 
@@ -137,7 +142,7 @@ export interface CloseResult {
 export async function closeSession(sessionId: string, counted: number, userId: string | null, notes: string | null = null): Promise<CloseResult> {
   if (!Number.isInteger(counted) || counted < 0) throw new Error('Ingresá el efectivo contado');
   const deviceId = await getDeviceId();
-  return db.transaction('rw', [db.cash_sessions, db.cash_movements, db.sales, db.payments, db.sync_queue], async () => {
+  return db.transaction('rw', [db.cash_sessions, db.cash_movements, db.sales, db.payments, db.sale_returns, db.sync_queue], async () => {
     const summary = await cashSummary(sessionId);
     if (!summary) throw new Error('La caja no existe');
     if (summary.session.closed_at) throw new Error('La caja ya está cerrada');

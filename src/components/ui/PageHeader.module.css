@@ -21,3 +21,16 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* Celular: los botones ocupan todo el ancho en columnas parejas, sin huecos a la derecha. */
+@media (max-width: 600px) {
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    width: 100%;
+  }
+
+  .actions > * {
+    min-width: 0;
+  }
+}

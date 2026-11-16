@@ -55,6 +55,7 @@ export function CashDetail({ summary }: { summary: CashSummary }) {
         {(Object.entries(summary.byMethod) as [Payment['method'], number][]).map(([method, amount]) => (
           <FactRow key={method} label={PAYMENT_LABELS[method]} value={formatMoney(amount)} />
         ))}
+        {summary.returns.count > 0 && <FactRow label={`Devoluciones (${summary.returns.count})`} value={`-${formatMoney(summary.returns.cash)}`} />}
         {summary.withdrawals > 0 && <FactRow label="Retiros" value={`-${formatMoney(summary.withdrawals)}`} />}
         {summary.deposits > 0 && <FactRow label="Ingresos" value={formatMoney(summary.deposits)} />}
         <dt>

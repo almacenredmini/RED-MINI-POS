@@ -247,6 +247,7 @@ function Report({ report, start, days, showCost, allStores }: { report: SalesRep
           highlight
           foot={[
             report.voided.count > 0 ? `${report.voided.count} anuladas, ${formatMoney(report.voided.total)}` : 'Sin anuladas',
+            report.returns.count > 0 ? `${report.returns.count} ${report.returns.count === 1 ? 'devolución' : 'devoluciones'} (-${formatMoney(report.returns.total)})` : null,
             report.common.count > 0 ? `Sin contar ${report.common.count} productos comunes (${formatMoney(report.common.total)})` : null,
           ]
             .filter(Boolean)

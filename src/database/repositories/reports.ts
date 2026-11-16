@@ -1,5 +1,5 @@
 import { db } from '../db';
-import type { Payment, Sale } from '@/types/domain';
+import type { Payment, Sale, SaleReturn } from '@/types/domain';
 
 /**
  * Reportes calculados en el dispositivo con lo que tiene en su base local:
@@ -24,6 +24,8 @@ export interface SalesReport {
   voided: { count: number; total: number };
   /** Productos comunes (inventados en el momento): no entran en ningún total del reporte, se informan aparte. */
   common: { count: number; total: number };
+  /** Devoluciones de productos hechas en el período (restan del total). Las de productos comunes no cuentan acá. */
+  returns: { count: number; total: number };
   /** Lo cobrado por medio de pago: incluye los productos comunes, porque es plata que entró a la caja. */
   byMethod: Partial<Record<Payment['method'], number>>;
   /** Clave `AAAA-MM-DD` en hora local. */
@@ -56,6 +58,16 @@ async function loadSales(storeId: string | null, from: string, to: string): Prom
   return storeId
     ? db.sales.where('[store_id+occurred_at]').between([storeId, from], [storeId, to], true, false).toArray()
     : db.sales.where('occurred_at').between(from, to, true, false).toArray();
+}
+
+/** Devoluciones del período, sin las de tickets cancelados (esos ya no suman). */
+async function loadReturns(storeId: string | null, from: string, to: string): Promise<{ returns: SaleReturn[]; saleById: Map<string, Sale> }> {
+  const rows = storeId
+    ? await db.sale_returns.where('[store_id+occurred_at]').between([storeId, from], [storeId, to], true, false).toArray()
+    : await db.sale_returns.where('occurred_at').between(from, to, true, false).toArray();
+  const sales = await db.sales.bulkGet([...new Set(rows.map((r) => r.sale_id))]);
+  const saleById = new Map(sales.filter((s): s is Sale => !!s).map((s) => [s.id, s]));
+  return { returns: rows.filter((r) => saleById.get(r.sale_id)?.status === 'completed'), saleById };
 }
 
 /** Una fila por producto vendido, para exportar a Excel. */
@@ -121,6 +133,29 @@ export async function salesLines(storeId: string | null, from: string, to: strin
       });
     }
   }
+  // Las devoluciones van como filas en negativo, el día que se hicieron.
+  const { returns, saleById } = await loadReturns(storeId, from, to);
+  for (const r of returns) {
+    if (!r.product_id) continue;
+    const sale = saleById.get(r.sale_id)!;
+    const cat = productById.get(r.product_id)?.category_id;
+    lines.push({
+      date: localDay(r.occurred_at),
+      time: new Date(r.occurred_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+      ticket: sale.number,
+      store: storeName.get(r.store_id) ?? '',
+      user: r.user_id ? (userName.get(r.user_id) ?? 'Usuario borrado') : '',
+      methods: `Devolución (${methodLabel(r.refund_method)})`,
+      category: cat ? (categoryName.get(cat) ?? '') : 'Sin categoría',
+      product: productById.get(r.product_id)?.name ?? r.description,
+      quantity: -r.quantity,
+      unitPrice: r.unit_price_cents,
+      discount: 0,
+      total: -r.total_cents,
+      cost: -Math.round(r.unit_cost_cents * r.quantity),
+    });
+  }
+  lines.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
   return lines;
 }
 
@@ -198,10 +233,38 @@ export async function salesReport(storeId: string | null, from: string, to: stri
     bump(categories_, cat ?? '-', cat ? (categoryName.get(cat) ?? 'Sin categoría') : 'Sin categoría', { quantity: i.quantity, total, cost });
   }
 
+  // Devoluciones: restan el día y la hora en que se hicieron; el vendedor sigue siendo el del ticket.
+  const { returns: allReturns, saleById: returnSales } = await loadReturns(storeId, from, to);
+  const returns = { count: 0, total: 0 };
+  let returnedCost = 0;
+  for (const r of allReturns) {
+    byMethod[r.refund_method] = (byMethod[r.refund_method] ?? 0) - r.total_cents;
+    if (!r.product_id) {
+      common.total -= r.total_cents;
+      continue;
+    }
+    const total = -r.total_cents;
+    const cost = -Math.round(r.unit_cost_cents * r.quantity);
+    returns.count += 1;
+    returns.total += r.total_cents;
+    returnedCost -= cost;
+    const day = localDay(r.occurred_at);
+    byDay.set(day, (byDay.get(day) ?? 0) + total);
+    byHour[new Date(r.occurred_at).getHours()]!.total += total;
+    const seller = returnSales.get(r.sale_id)?.user_id ?? null;
+    bump(stores_, r.store_id, storeName.get(r.store_id) ?? 'Sucursal', { total, cost });
+    bump(users_, seller ?? '-', seller ? (userName.get(seller) ?? 'Usuario borrado') : 'Sin usuario', { total, cost });
+    const product = productById.get(r.product_id);
+    bump(products_, r.product_id, product?.name ?? r.description, { quantity: -r.quantity, total, cost });
+    const cat = product?.category_id ?? null;
+    bump(categories_, cat ?? '-', cat ? (categoryName.get(cat) ?? 'Sin categoría') : 'Sin categoría', { quantity: -r.quantity, total, cost });
+  }
+
   return {
-    total: counted.reduce((t, s) => t + totalOf(s), 0),
+    total: counted.reduce((t, s) => t + totalOf(s), 0) - returns.total,
     tickets: counted.length,
-    cost: [...costBySale.values()].reduce((t, c) => t + c, 0),
+    cost: [...costBySale.values()].reduce((t, c) => t + c, 0) - returnedCost,
+    returns,
     discount: productItems.reduce((t, i) => t + shareOf(i), 0),
     voided: { count: voided.length, total: voided.reduce((t, s) => t + s.total_cents, 0) },
     common,

@@ -20,6 +20,7 @@ import { PaymentModal } from '@/components/pos/PaymentModal';
 import { ProductSearchModal } from '@/components/pos/ProductSearchModal';
 import { addCommonLine, addLine, cartTotals, changeQuantity, EMPTY_CART, removeLine } from '@/services/cart';
 import { CommonProductModal } from '@/components/pos/CommonProductModal';
+import { DayTicketsModal } from '@/components/sales/DayTicketsModal';
 import { uuidv7 } from '@/services/id';
 import { formatMoney } from '@/services/money';
 import type { PaymentDraft } from '@/services/payment';
@@ -27,7 +28,7 @@ import { printHtml, renderTicketHtml } from '@/services/ticket';
 import type { Product } from '@/types/domain';
 import styles from '@/components/pos/Pos.module.css';
 
-type Dialog = 'search' | 'pay' | 'discount' | 'camera' | 'common' | null;
+type Dialog = 'search' | 'pay' | 'discount' | 'camera' | 'common' | 'tickets' | null;
 
 /** Un lector escribe mucho más rápido: un + o - pegado a otra tecla es parte de un código, no un atajo. */
 const MIN_MANUAL_KEY_GAP_MS = 120;
@@ -59,6 +60,7 @@ export function PosPage() {
 
   const totals = cartTotals(cart);
   const canDiscount = can('sales.discount');
+  const canReturn = can('sales.void');
   const selected = cart.lines.find((l) => l.product_id === selectedId) ?? cart.lines.at(-1) ?? null;
 
   const addProduct = (p: Product, barcode: string | null) => {
@@ -261,6 +263,11 @@ export function PosPage() {
         <Button variant="primary" size="lg" block disabled={cart.lines.length === 0} onClick={openPayment}>
           Vender <kbd className={styles.kbdDark}>F12</kbd>
         </Button>
+        {canReturn && (
+          <Button variant="ghost" icon="purchases" block onClick={() => setDialog('tickets')}>
+            Ventas del día y devoluciones
+          </Button>
+        )}
       </aside>
 
       {dialog === 'search' && (
@@ -284,6 +291,7 @@ export function PosPage() {
           }}
         />
       )}
+      {dialog === 'tickets' && canReturn && <DayTicketsModal onClose={() => setDialog(null)} />}
       {dialog === 'pay' && <PaymentModal total={totals.total} onClose={() => setDialog(null)} onConfirm={closeSale} />}
       {dialog === 'discount' && canDiscount && <DiscountModal current={cart.discount} onApply={(discount) => setCart((c) => ({ ...c, discount }))} onClose={() => setDialog(null)} />}
       <ScannerModal open={dialog === 'camera'} continuous status={lastScan} onClose={() => setDialog(null)} onDetected={(code) => void addByCode(code, false)} />

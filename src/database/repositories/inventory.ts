@@ -117,7 +117,9 @@ const MOVEMENT_LABELS: Record<StockMovement['type'], string> = {
 
 const KIND_LABELS: Record<ManualKind, string> = { entry: 'Entrada', exit: 'Salida', count: 'Conteo' };
 
-export function movementLabel(m: Pick<StockMovement, 'type' | 'kind'>): string {
+export function movementLabel(m: Pick<StockMovement, 'type' | 'kind'> & { reason?: string | null }): string {
+  // Una devolución de cliente usa el tipo de la anulación: el motivo la distingue.
+  if (m.type === 'sale_void' && m.reason?.startsWith('Devolución: ')) return 'Devolución de cliente';
   return m.type === 'adjustment' && m.kind ? KIND_LABELS[m.kind] : MOVEMENT_LABELS[m.type];
 }
 

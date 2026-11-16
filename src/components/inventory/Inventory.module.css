@@ -176,6 +176,18 @@
   font-weight: 600;
 }
 
+/* Celular: las pestañas se reparten el ancho y entran todas sin deslizar. */
+@media (max-width: 600px) {
+  .tabs > * {
+    flex: 1 1 auto;
+  }
+
+  .tab {
+    padding: 10px 6px;
+    font-size: 0.85rem;
+  }
+}
+
 .tabActive {
   border-bottom-color: var(--accent);
   color: var(--accent);

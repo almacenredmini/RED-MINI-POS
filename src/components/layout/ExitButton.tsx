@@ -25,7 +25,7 @@ export function ExitButton({ variant = 'ghost' }: { variant?: 'ghost' | 'seconda
     <>
       {canSwitch && (
         <Button size="sm" variant={variant} onClick={logout} title="Sale sin cerrar la caja">
-          Cambiar usuario
+          Cambiar<span className="hide-narrow"> usuario</span>
         </Button>
       )}
       {(!open || mine || !canSwitch) && (

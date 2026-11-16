@@ -86,6 +86,21 @@ export async function reverseCharge(sale: { accountId: UUID; amount: Cents; sale
   });
 }
 
+/** Devolución de algo cobrado a cuenta: baja la deuda. */
+export async function addAccountReturn(sale: { accountId: UUID; amount: Cents; saleId: UUID; storeId: UUID; userId: UUID | null; deviceId: UUID }): Promise<void> {
+  if (sale.amount <= 0) return;
+  await addMovement({
+    account_id: sale.accountId,
+    type: 'charge_void',
+    amount_cents: -sale.amount,
+    sale_id: sale.saleId,
+    store_id: sale.storeId,
+    user_id: sale.userId,
+    device_id: sale.deviceId,
+    note: 'Devolución',
+  });
+}
+
 /** Descuento del sueldo: deja el saldo en cero y el detalle queda en el historial. */
 export async function settleAccount(accountId: UUID, storeId: UUID, userId: UUID | null): Promise<Cents> {
   const deviceId = await getDeviceId();

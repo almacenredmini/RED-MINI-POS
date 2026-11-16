@@ -71,3 +71,11 @@
 .name {
   min-width: 140px;
 }
+
+/* Celular: los filtros se reparten el ancho, sin hueco a la derecha. */
+@media (max-width: 600px) {
+  .filters > * {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+}

@@ -116,3 +116,10 @@ html {
   place-items: center;
   height: 100%;
 }
+
+/* Texto que sobra en celulares angostos (por ejemplo "Cambiar usuario" → "Cambiar"). */
+@media (max-width: 420px) {
+  .hide-narrow {
+    display: none;
+  }
+}

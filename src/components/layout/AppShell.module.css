@@ -30,18 +30,21 @@
   gap: 10px;
 }
 
-/* PC: la sucursal va a la derecha, junto al estado y Salir. */
+/* PC: pendientes y sucursal van a la derecha, junto al estado y Salir. */
 .topbarStore {
   display: flex;
+  align-items: center;
+  gap: 10px;
   margin-left: auto;
   margin-right: 10px;
 }
 
-/* Celular: la sucursal pasa a una segunda fila, centrada y con el nombre completo. */
+/* Celular: segunda fila con los pendientes a la izquierda y la sucursal a la derecha. */
 @media (max-width: 899px) {
   .topbar {
     display: grid;
     grid-template-columns: auto 1fr;
+    column-gap: 6px;
     grid-template-rows: var(--topbar-h) var(--storebar-h);
     grid-template-areas:
       'logo right'
@@ -61,13 +64,26 @@
 
   .topbarStore {
     grid-area: store;
-    justify-content: center;
+    justify-content: space-between;
     align-items: flex-start;
     margin: 0;
   }
 
   .topbarStore .storeSelect {
     max-width: 200px;
+  }
+
+  /* Que los botones de la derecha no se monten sobre el logo en pantallas chicas. */
+  .topbar > :first-child {
+    flex-shrink: 0;
+  }
+
+  .topbarRight {
+    gap: 4px;
+  }
+
+  .topbarRight > .userName ~ button {
+    padding: 0 8px;
   }
 }
 

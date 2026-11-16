@@ -4,13 +4,13 @@ import { enqueue } from '../outbox';
 import { cartTotals, lineTotal, type Cart } from '@/services/cart';
 import { nowISO, uuidv7 } from '@/services/id';
 import type { PaymentDraft } from '@/services/payment';
-import type { Payment, Sale, SaleItem, Store } from '@/types/domain';
-import { chargeAccount, reverseCharge } from './accounts';
+import type { Payment, Sale, SaleItem, SaleReturn, Store } from '@/types/domain';
+import { addAccountReturn, chargeAccount, reverseCharge } from './accounts';
 import { ensureOpenSession } from './cash';
 import { applyStockMovement } from './stock';
 import { tracksStock } from './products';
 
-const TABLES = [db.products, db.sales, db.sale_items, db.payments, db.stock_movements, db.stock, db.meta, db.sync_queue, db.employee_accounts, db.account_movements, db.cash_sessions];
+const TABLES = [db.products, db.sales, db.sale_items, db.payments, db.stock_movements, db.stock, db.meta, db.sync_queue, db.employee_accounts, db.account_movements, db.cash_sessions, db.sale_returns];
 
 export interface NewSale {
   /** Generado al abrir el cobro: un doble F1/F2 no puede duplicar la venta porque el id ya existe. */
@@ -133,6 +133,10 @@ export async function voidSale(saleId: string, userId: string | null, reason: st
     const sale = await db.sales.get(saleId);
     if (!sale) throw new Error('La venta no existe');
     if (sale.status === 'voided') throw new Error('La venta ya está anulada');
+    // La plata de una devolución ya salió de una caja: cancelar encima la descontaría dos veces.
+    if ((await db.sale_returns.where('sale_id').equals(saleId).count()) > 0) {
+      throw new Error('Este ticket tiene devoluciones: devolvé los productos que quedan en vez de cancelarlo');
+    }
 
     const voided: Sale = {
       ...sale,
@@ -176,6 +180,103 @@ export async function voidSale(saleId: string, userId: string | null, reason: st
   });
 }
 
+/** Los movimientos de stock de una devolución usan el tipo de la anulación; el motivo los distingue. */
+export const RETURN_PREFIX = 'Devolución: ';
+
+export interface NewReturn {
+  saleItemId: string;
+  quantity: number;
+  reason: string;
+  /** Sucursal del dispositivo: la plata sale de su caja abierta. */
+  storeId: string;
+  userId: string | null;
+}
+
+/** Cuánto se devolvió ya de cada ítem del ticket. */
+export async function returnedBySaleItem(saleId: string): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  for (const r of await db.sale_returns.where('sale_id').equals(saleId).toArray()) out.set(r.sale_item_id, (out.get(r.sale_item_id) ?? 0) + r.quantity);
+  return out;
+}
+
+/**
+ * Devuelve parte o todo un ítem de un ticket. El ticket no se modifica: queda un registro de devolución,
+ * el stock vuelve (si la venta lo había descontado) y la plata sale de la caja abierta de este dispositivo,
+ * o baja la deuda si el ticket se cobró entero a cuenta de un empleado.
+ */
+export async function returnSaleItem({ saleItemId, quantity, reason, storeId, userId }: NewReturn): Promise<SaleReturn> {
+  if (!reason.trim()) throw new Error('Indicá el motivo de la devolución');
+  if (!(quantity > 0)) throw new Error('Indicá cuántas unidades se devuelven');
+  const deviceId = await getDeviceId();
+  const now = nowISO();
+
+  return db.transaction('rw', TABLES, async () => {
+    const item = await db.sale_items.get(saleItemId);
+    const sale = item && (await db.sales.get(item.sale_id));
+    if (!item || !sale) throw new Error('El ticket no existe');
+    if (sale.status === 'voided') throw new Error('El ticket está cancelado');
+    const left = item.quantity - ((await returnedBySaleItem(sale.id)).get(item.id) ?? 0);
+    if (quantity > left + 1e-9) throw new Error(left > 0 ? `Sólo quedan ${left} para devolver` : 'Ese producto ya se devolvió');
+
+    // Se devuelve lo que pagó: con su parte del descuento general.
+    const gross = Math.round(quantity * item.unit_price_cents);
+    const share = sale.subtotal_cents > 0 ? Math.round((gross * sale.discount_cents) / sale.subtotal_cents) : 0;
+    const payments = await db.payments.where('sale_id').equals(sale.id).toArray();
+    const account = payments.length > 0 && payments.every((p) => p.method === 'employee_account' && p.account_id) ? payments[0]!.account_id! : null;
+    const cash = await ensureOpenSession(storeId, userId, deviceId);
+
+    const ret: SaleReturn = {
+      id: uuidv7(),
+      sale_id: sale.id,
+      sale_item_id: item.id,
+      store_id: sale.store_id,
+      cash_session_id: cash.id,
+      product_id: item.product_id,
+      description: item.description,
+      quantity,
+      unit_price_cents: item.unit_price_cents,
+      unit_cost_cents: item.unit_cost_cents,
+      total_cents: gross - share,
+      refund_method: account ? 'employee_account' : 'cash',
+      account_id: account,
+      reason: reason.trim(),
+      user_id: userId,
+      device_id: deviceId,
+      occurred_at: now,
+    };
+    await db.sale_returns.add(ret);
+    await enqueue('sale_returns', ret.id, 'upsert', ret);
+
+    if (account) await addAccountReturn({ accountId: account, amount: ret.total_cents, saleId: sale.id, storeId: sale.store_id, userId, deviceId });
+
+    const productId = item.product_id;
+    if (productId) {
+      const sold = await db.stock_movements.where('reference_id').equals(sale.id).filter((m) => m.product_id === productId && m.type === 'sale').count();
+      if (sold > 0) {
+        await applyStockMovement({
+          id: uuidv7(),
+          store_id: sale.store_id,
+          product_id: productId,
+          type: 'sale_void',
+          quantity,
+          unit_cost_cents: item.unit_cost_cents,
+          reason: RETURN_PREFIX + ret.reason,
+          reference_type: 'sale',
+          reference_id: sale.id,
+          user_id: userId,
+          device_id: deviceId,
+          occurred_at: now,
+        });
+      }
+    }
+    return ret;
+  });
+}
+
+export async function listReturns(storeId: string, from: string, to: string): Promise<SaleReturn[]> {
+  return db.sale_returns.where('[store_id+occurred_at]').between([storeId, from], [storeId, to], true, false).toArray();
+}
+
 export function dayRange(date: Date = new Date()): [string, string] {
   const from = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const to = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
@@ -199,13 +300,16 @@ export async function daySummary(storeId: string, date: Date = new Date()) {
   const [from, to] = dayRange(date);
   const completed = (await listSales(storeId, from, to)).filter((s) => s.status === 'completed');
   const payments = await db.payments.where('sale_id').anyOf(completed.map((s) => s.id)).toArray();
+  // Las devoluciones restan del día en que se hacen.
+  const returns = await listReturns(storeId, from, to);
+  const refunded = (method: SaleReturn['refund_method']) => returns.filter((r) => r.refund_method === method).reduce((sum, r) => sum + r.total_cents, 0);
   const byMethod = (method: Payment['method']) => payments.filter((p) => p.method === method).reduce((sum, p) => sum + p.amount_cents, 0);
   return {
     tickets: completed.length,
-    total: completed.reduce((sum, s) => sum + s.total_cents, 0),
-    cash: byMethod('cash'),
+    total: completed.reduce((sum, s) => sum + s.total_cents, 0) - returns.reduce((sum, r) => sum + r.total_cents, 0),
+    cash: byMethod('cash') - refunded('cash'),
     card: byMethod('card'),
     transfer: byMethod('transfer'),
-    account: byMethod('employee_account'),
+    account: byMethod('employee_account') - refunded('employee_account'),
   };
 }

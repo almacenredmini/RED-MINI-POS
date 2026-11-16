@@ -7,6 +7,7 @@ import { recalcMinStockIfNewWeek } from '@/database/repositories/minStock';
 import { EmptyState } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Logo } from '@/components/ui/Logo';
+import { DayTasksButton } from '@/components/tasks/DayTasksModal';
 import { LoginPage } from '@/pages/LoginPage';
 import { ExitButton } from './ExitButton';
 import { ScreenGuard } from './ScreenGuard';
@@ -88,6 +89,7 @@ export function AppShell() {
         <div className={styles.topbar}>
           <Logo />
           <div className={styles.topbarStore}>
+            <DayTasksButton />
             <StoreSwitcher />
           </div>
           <div className={styles.topbarRight}>
