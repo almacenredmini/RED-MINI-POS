@@ -93,7 +93,7 @@ export function ScanPage() {
                 <div className={styles.info}>
                   <strong>{result.product.name}</strong>
                   <span className={`${styles.price} num`}>{formatMoney(result.product.price_cents)}</span>
-                  <span className="muted num">Stock en {store.name}: {current}</span>
+                  <span className="muted num">{result.product.track_stock === false ? 'Stock ilimitado' : `Stock en ${store.name}: ${current}`}</span>
                 </div>
               </div>
             ) : (
@@ -102,7 +102,7 @@ export function ScanPage() {
                 <span className="muted num">Código {result.code}</span>
               </div>
             )}
-            {result.product && can('stock.adjust') &&
+            {result.product && result.product.track_stock !== false && can('stock.adjust') &&
               (confirming ? (
                 <div className={styles.confirm} role="alert">
                   <p>

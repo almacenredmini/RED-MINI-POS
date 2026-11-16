@@ -57,6 +57,11 @@ export interface Product extends SyncMeta {
   image_path: string | null;
   has_image: boolean;
   active: boolean;
+  /**
+   * false = stock ilimitado: no se descuenta al vender, no avisa faltantes y no suma al valor del inventario.
+   * Los productos cargados antes de existir este campo no lo tienen: cuentan como `true`.
+   */
+  track_stock?: boolean;
   /** Índice derivado para búsqueda por prefijo de palabra. Sólo local. */
   search_words: string[];
 }
@@ -102,6 +107,19 @@ export interface SupplierInvoice extends SyncMeta {
   total_cents: Cents | null;
   items: SupplierInvoiceItem[];
   user_id: UUID | null;
+}
+
+/** Un cajero salió de la pantalla completa (minimizó, cambió de programa o salió con Esc/F11). Inmutable. */
+export interface ScreenExit {
+  id: UUID;
+  store_id: UUID;
+  user_id: UUID | null;
+  /** Nombre al momento de salir: sigue legible aunque después lo renombren. */
+  user_name: string;
+  device_id: UUID;
+  left_at: ISODate;
+  returned_at: ISODate;
+  seconds: number;
 }
 
 export type ProductChangeAction = 'created' | 'updated' | 'deleted';
@@ -174,7 +192,7 @@ export interface SyncQueueEntry {
   created_at: ISODate;
 }
 
-export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices';
+export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices' | 'screen_exits';
 
 export type UserRole = 'owner' | 'manager' | 'employee';
 

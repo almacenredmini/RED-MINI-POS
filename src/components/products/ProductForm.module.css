@@ -242,3 +242,13 @@
   color: var(--danger);
   font-weight: 500;
 }
+
+.stockNow {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.stockNow :global(.muted) {
+  font-size: 0.95rem;
+  font-weight: 500;
+}

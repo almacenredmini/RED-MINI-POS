@@ -1,6 +1,7 @@
 import type { Cents, ProductUnit, UUID } from '@/types/domain';
 
 export interface CartLine {
+  /** En un producto común es un id inventado ("comun:…"): no existe en el catálogo. */
   product_id: UUID;
   name: string;
   barcode: string | null;
@@ -8,6 +9,8 @@ export interface CartLine {
   quantity: number;
   unit_price_cents: Cents;
   unit_cost_cents: Cents;
+  /** Producto común: se inventa en el momento, no toca stock y no entra en los reportes. */
+  common?: boolean;
 }
 
 export type CartDiscount = { type: 'pct' | 'amount'; value: number };
@@ -49,4 +52,12 @@ export function changeQuantity(cart: Cart, productId: UUID, delta: number): Cart
 
 export function removeLine(cart: Cart, productId: UUID): Cart {
   return { ...cart, lines: cart.lines.filter((l) => l.product_id !== productId) };
+}
+
+/** Producto común: descripción y precio inventados en el momento para salir del paso. */
+export function addCommonLine(cart: Cart, name: string, priceCents: Cents, id: string): Cart {
+  return {
+    ...cart,
+    lines: [...cart.lines, { product_id: `comun:${id}`, name, barcode: null, unit: 'unit', quantity: 1, unit_price_cents: priceCents, unit_cost_cents: 0, common: true }],
+  };
 }

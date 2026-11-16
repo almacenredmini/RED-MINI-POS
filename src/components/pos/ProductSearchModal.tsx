@@ -62,7 +62,7 @@ export function ProductSearchModal({ storeId, initialQuery = '', onPick, onClose
             <button type="button" className={`${styles.result} ${i === cursor ? styles.resultActive : ''}`} onClick={() => onPick(p)}>
               <span className={styles.resultName}>
                 <strong>{p.name}</strong>
-                <span className="muted">Stock {stock.get(p.id) ?? 0}</span>
+                <span className="muted">{p.track_stock === false ? 'Stock ilimitado' : `Stock ${stock.get(p.id) ?? 0}`}</span>
               </span>
               <span className={`${styles.resultPrice} num`}>{formatMoney(p.price_cents)}</span>
             </button>

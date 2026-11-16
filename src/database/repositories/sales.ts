@@ -8,8 +8,9 @@ import type { Payment, Sale, SaleItem, Store } from '@/types/domain';
 import { chargeAccount, reverseCharge } from './accounts';
 import { ensureOpenSession } from './cash';
 import { applyStockMovement } from './stock';
+import { tracksStock } from './products';
 
-const TABLES = [db.sales, db.sale_items, db.payments, db.stock_movements, db.stock, db.meta, db.sync_queue, db.employee_accounts, db.account_movements, db.cash_sessions];
+const TABLES = [db.products, db.sales, db.sale_items, db.payments, db.stock_movements, db.stock, db.meta, db.sync_queue, db.employee_accounts, db.account_movements, db.cash_sessions];
 
 export interface NewSale {
   /** Generado al abrir el cobro: un doble F1/F2 no puede duplicar la venta porque el id ya existe. */
@@ -73,11 +74,13 @@ export async function createSale({ id, store, userId, cart, payments }: NewSale)
 
     const items: SaleItem[] = [];
     for (const [i, l] of cart.lines.entries()) {
+      // El producto común no existe en el catálogo: queda sin producto, como ítem libre.
+      const productId = l.common ? null : l.product_id;
       const item: SaleItem = {
         id: uuidv7(),
         sale_id: sale.id,
         line: i + 1,
-        product_id: l.product_id,
+        product_id: productId,
         barcode: l.barcode,
         description: l.name,
         quantity: l.quantity,
@@ -88,10 +91,13 @@ export async function createSale({ id, store, userId, cart, payments }: NewSale)
       };
       await db.sale_items.add(item);
       await enqueue('sale_items', item.id, 'upsert', item);
+      items.push(item);
+      // Ni el producto común ni los de stock ilimitado descuentan stock.
+      if (!productId || !tracksStock(await db.products.get(productId))) continue;
       await applyStockMovement({
         id: uuidv7(),
         store_id: store.id,
-        product_id: l.product_id,
+        product_id: productId,
         type: 'sale',
         quantity: -l.quantity,
         unit_cost_cents: l.unit_cost_cents,
@@ -102,7 +108,6 @@ export async function createSale({ id, store, userId, cart, payments }: NewSale)
         device_id: deviceId,
         occurred_at: now,
       });
-      items.push(item);
     }
 
     const rows: Payment[] = payments.map((p) => ({ ...p, id: uuidv7(), sale_id: sale.id, occurred_at: now }));
@@ -150,6 +155,9 @@ export async function voidSale(saleId: string, userId: string | null, reason: st
     const items = await db.sale_items.where('sale_id').equals(saleId).toArray();
     for (const item of items) {
       if (!item.product_id) continue;
+      // Si la venta no descontó stock (stock ilimitado), anularla tampoco lo devuelve.
+      const sold = await db.stock_movements.where('reference_id').equals(sale.id).filter((m) => m.reference_id === sale.id && m.product_id === item.product_id && m.type === 'sale').count();
+      if (sold === 0) continue;
       await applyStockMovement({
         id: uuidv7(),
         store_id: sale.store_id,

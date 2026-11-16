@@ -9,6 +9,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Logo } from '@/components/ui/Logo';
 import { LoginPage } from '@/pages/LoginPage';
 import { ExitButton } from './ExitButton';
+import { ScreenGuard } from './ScreenGuard';
 import { SyncIndicator } from './SyncIndicator';
 import { StorePicker } from './StorePicker';
 import { StoreSwitcher } from './StoreSwitcher';
@@ -82,6 +83,7 @@ export function AppShell() {
 
   return (
     <div className={styles.shell}>
+      <ScreenGuard storeId={currentStore.id} />
       <header className={styles.header}>
         <div className={styles.topbar}>
           <Logo />

@@ -34,6 +34,7 @@ const FIELDS: Record<string, string> = {
   price_cents: 'Precio',
   active: 'Activo',
   barcodes: 'Códigos',
+  track_stock: 'Stock',
 };
 
 const UNITS: Record<string, string> = { unit: 'Unidad', kg: 'Kilogramo' };

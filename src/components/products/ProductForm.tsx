@@ -5,7 +5,7 @@ import { ensureCategory, listCategories } from '@/database/repositories/categori
 import { listProductCosts } from '@/database/repositories/costs';
 import type { ProductInput } from '@/database/repositories/products';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCurrentStore } from '@/contexts/DeviceContext';
+import { useCurrentStore, useDevice } from '@/contexts/DeviceContext';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Field, Input, Select } from '@/components/ui/Field';
@@ -43,8 +43,17 @@ export function ProductForm({ initial, productId, submitting, onSubmit, footer }
   const { can } = useAuth();
   const store = useCurrentStore();
   const autoMin = useLiveQuery(() => (productId ? db.store_min_stock.get(`${store.id}:${productId}`) : undefined), [productId, store.id]);
-  const currentStock = useLiveQuery(async () => (productId ? ((await db.stock.get(`${store.id}:${productId}`))?.quantity ?? 0) : 0), [productId, store.id], 0);
+  const { stores } = useDevice();
+  // Stock de cada sucursal que tiene este dispositivo (la PC de un local ve la suya; el celular del dueño, todas).
+  const stockByStore = useLiveQuery(
+    async () => new Map((productId ? await db.stock.where('product_id').equals(productId).toArray() : []).map((s) => [s.store_id, s.quantity])),
+    [productId],
+    new Map<string, number>(),
+  );
+  const currentStock = stockByStore.get(store.id) ?? 0;
+  const qty = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
   const [v, setV] = useState(initial);
+  const unlimited = v.track_stock === false;
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deltaText, setDeltaText] = useState('');
@@ -64,12 +73,12 @@ export function ProductForm({ initial, productId, submitting, onSubmit, footer }
     e.preventDefault();
     if (!v.name.trim()) return setError('El nombre es obligatorio');
     if (v.price_cents <= 0) return setError('Ingresá un precio de venta');
-    if (delta === null) return setError('El ajuste de stock tiene que ser un número, por ejemplo +5 o -3');
+    if (delta === null && !unlimited) return setError('El ajuste de stock tiene que ser un número, por ejemplo +5 o -3');
     setError(null);
 
     let categoryId = v.category_id;
     if (newCategory?.trim()) categoryId = (await ensureCategory(newCategory)).id;
-    onSubmit({ ...v, category_id: categoryId, stock_delta: delta }, false);
+    onSubmit({ ...v, category_id: categoryId, stock_delta: unlimited ? 0 : (delta ?? 0) }, false);
   };
 
   return (
@@ -81,7 +90,7 @@ export function ProductForm({ initial, productId, submitting, onSubmit, footer }
               <Field label="Nombre" className={styles.span2}>
                 {(id) => <Input id={id} value={v.name} onChange={(e) => set('name', e.target.value)} placeholder="Ej: Fernet Branca 750 ml" autoFocus={!initial.name} />}
               </Field>
-              {can('stock.adjust') && (
+              {can('stock.adjust') && !unlimited && (
                 <Field
                   label="Ajuste de stock (+ o −)"
                   error={delta === null ? 'Tiene que ser un número' : null}
@@ -147,6 +156,34 @@ export function ProductForm({ initial, productId, submitting, onSubmit, footer }
         </div>
 
         <div className={styles.colSide}>
+          <Card title="Stock">
+            <div className={styles.grid1}>
+              {unlimited ? (
+                <p className={styles.stockNow}>Ilimitado</p>
+              ) : productId ? (
+                <>
+                  <p className={styles.stockNow}>
+                    <span className="num">{qty(currentStock)}</span>
+                    <span className="muted"> en {store.name}</span>
+                  </p>
+                  {stores
+                    .filter((s) => s.id !== store.id && stockByStore.has(s.id))
+                    .map((s) => (
+                      <p key={s.id} className="muted num">
+                        {s.name}: {qty(stockByStore.get(s.id) ?? 0)}
+                      </p>
+                    ))}
+                </>
+              ) : (
+                <p className="muted">Producto nuevo: todavía no tiene stock.</p>
+              )}
+              <label className={styles.toggle}>
+                <input type="checkbox" checked={unlimited} onChange={(e) => set('track_stock', !e.target.checked)} />
+                <span>Stock ilimitado</span>
+              </label>
+              {unlimited && <p className="muted">No se descuenta al vender, no avisa faltantes y no suma al valor del inventario. Sirve para servicios o cosas que no se cuentan.</p>}
+            </div>
+          </Card>
           {costs.length > 0 && (
             <Card title="Costos históricos">
               <ul className={styles.costs}>
@@ -161,15 +198,18 @@ export function ProductForm({ initial, productId, submitting, onSubmit, footer }
           )}
           <Card title="Control">
             <div className={styles.grid1}>
-              <label className={styles.toggle}>
-                <input type="checkbox" checked={v.auto_min_stock} onChange={(e) => set('auto_min_stock', e.target.checked)} />
-                <span>Ajustar el mínimo cada semana según las ventas</span>
-              </label>
-              {v.auto_min_stock && autoMin && (
+              {!unlimited && (
+                <label className={styles.toggle}>
+                  <input type="checkbox" checked={v.auto_min_stock} onChange={(e) => set('auto_min_stock', e.target.checked)} />
+                  <span>Ajustar el mínimo cada semana según las ventas</span>
+                </label>
+              )}
+              {!unlimited && v.auto_min_stock && autoMin && (
                 <p className="muted num">
                   Hoy en {store.name}: mínimo {autoMin.min_stock} (vende {Math.round(autoMin.weekly_avg * 10) / 10} por semana)
                 </p>
               )}
+              {!unlimited && (
               <Field
                 label={v.auto_min_stock ? 'Stock mínimo inicial' : 'Stock mínimo'}
                 hint={v.auto_min_stock ? 'Se usa hasta que el producto tenga ventas en la sucursal.' : 'Alerta cuando el stock llegue a este valor.'}
@@ -178,6 +218,7 @@ export function ProductForm({ initial, productId, submitting, onSubmit, footer }
                   <Input id={id} type="number" min={0} inputMode="numeric" placeholder="0" value={v.min_stock || ''} onFocus={(e) => e.target.select()} onChange={(e) => set('min_stock', Math.max(0, Number(e.target.value) || 0))} />
                 )}
               </Field>
+              )}
               <label className={styles.toggle}>
                 <input type="checkbox" checked={v.active} onChange={(e) => set('active', e.target.checked)} />
                 <span>Activo para la venta</span>

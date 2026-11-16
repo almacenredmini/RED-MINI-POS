@@ -22,6 +22,8 @@ export interface ProductInput {
   barcodes: string[];
   /** Entrada (+) o salida (-) de stock que se guarda junto con el producto. */
   stock_adjustment?: { store_id: UUID; user_id: UUID | null; quantity: number };
+  /** false = stock ilimitado. Sin valor: queda como estaba (nuevo = controla stock). */
+  track_stock?: boolean;
   /** Quién hace el cambio (para el Reporte de movimientos). */
   user_id?: UUID | null;
   /** undefined = sin cambios; null = quitar imagen; Blob = reemplazar. */
@@ -109,6 +111,7 @@ export async function saveProduct(input: ProductInput, existingId?: string): Pro
       min_stock: input.min_stock,
       auto_min_stock: input.auto_min_stock,
       active: input.active,
+      track_stock: input.track_stock ?? tracksStock(previous),
       has_image: hasImage,
       search_words: buildSearchWords(input.name, input.brand, input.sku),
     };
@@ -123,8 +126,12 @@ export async function saveProduct(input: ProductInput, existingId?: string): Pro
     const oldCodes = previous ? (await getProductBarcodes(id)).map((b) => b.code).sort() : [];
     await syncBarcodes(id, codes, deviceId);
     const newCodes = [...codes].sort();
-    const barcodeChange = previous && oldCodes.join(',') !== newCodes.join(',') ? { barcodes: [oldCodes.join(', '), newCodes.join(', ')] as [unknown, unknown] } : undefined;
-    await logProductChange(previous, product, { source: 'manual', userId: input.user_id ?? null, deviceId }, barcodeChange);
+    const label = (track: boolean) => (track ? 'Controla stock' : 'Ilimitado');
+    const extra = {
+      ...(previous && oldCodes.join(',') !== newCodes.join(',') && { barcodes: [oldCodes.join(', '), newCodes.join(', ')] as [unknown, unknown] }),
+      ...(previous && tracksStock(previous) !== tracksStock(product) && { track_stock: [label(tracksStock(previous)), label(tracksStock(product))] as [unknown, unknown] }),
+    };
+    await logProductChange(previous, product, { source: 'manual', userId: input.user_id ?? null, deviceId }, Object.keys(extra).length ? extra : undefined);
 
     if (previous ? previous.cost_cents !== input.cost_cents : input.cost_cents > 0) {
       await recordCost(id, input.cost_cents, deviceId);
@@ -133,7 +140,8 @@ export async function saveProduct(input: ProductInput, existingId?: string): Pro
     if (input.image === null) await db.product_images.delete(id);
     else if (input.image) await db.product_images.put({ product_id: id, blob: input.image, updated_at: nowISO() });
 
-    if (input.stock_adjustment) {
+    // Un producto de stock ilimitado no lleva movimientos de stock.
+    if (input.stock_adjustment && tracksStock(product)) {
       const { store_id, user_id, quantity } = input.stock_adjustment;
       await applyStockMovement({
         id: uuidv7(),
@@ -192,6 +200,9 @@ export async function deleteProduct(id: string, userId: UUID | null = null): Pro
     await logProductChange(p, removed, { source: 'manual', userId, deviceId });
   });
 }
+
+/** Los productos sin el campo (cargados antes) controlan stock. */
+export const tracksStock = (p: Pick<Product, 'track_stock'> | undefined) => p?.track_stock !== false;
 
 export function toSyncProduct(p: Product) {
   const { search_words: _sw, has_image: _hi, ...rest } = p;

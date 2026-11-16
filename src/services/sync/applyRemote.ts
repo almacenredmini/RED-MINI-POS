@@ -43,7 +43,7 @@ async function putUnique(table: Table, row: Row, field: string, pending: Set<str
 const UNIQUE_FIELD: Partial<Record<SyncTable, string>> = { barcodes: 'code', users: 'username', stores: 'code', sales: 'number' };
 
 export const MUTABLE: SyncTable[] = ['stores', 'users', 'categories', 'products', 'barcodes', 'suppliers', 'purchases', 'employee_accounts', 'sales', 'cash_sessions', 'staff_schedules', 'supplier_invoices'];
-export const IMMUTABLE: SyncTable[] = ['sale_items', 'payments', 'product_cost_history', 'account_movements', 'purchase_items', 'cash_movements', 'product_changes'];
+export const IMMUTABLE: SyncTable[] = ['sale_items', 'payments', 'product_cost_history', 'account_movements', 'purchase_items', 'cash_movements', 'product_changes', 'screen_exits'];
 
 /**
  * Aplica una página de cambios del servidor en una sola transacción. No encola nada:

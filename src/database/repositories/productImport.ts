@@ -7,7 +7,7 @@ import type { ImportRow } from '@/services/spreadsheet';
 import type { Barcode, Category, Product, ProductChange, ProductCost, StockMovement, UUID } from '@/types/domain';
 import { newCostRow } from './costs';
 import { buildProductChange } from './productChanges';
-import { toSyncProduct } from './products';
+import { toSyncProduct, tracksStock } from './products';
 import { applyStockMovements } from './stock';
 
 const TABLES = [db.categories, db.products, db.barcodes, db.product_cost_history, db.product_changes, db.stock, db.stock_movements, db.sync_queue];
@@ -138,7 +138,8 @@ export async function importProducts(rows: ImportRow[], storeId: UUID, userId: U
         catalog.byName.set(normalize(row.name), product);
       }
 
-      if (row.quantity !== null) {
+      // Stock ilimitado: la cantidad del archivo no se usa.
+      if (row.quantity !== null && tracksStock(product)) {
         const current = stock.get(product.id) ?? 0;
         const delta = row.quantity - current;
         if (delta !== 0) {

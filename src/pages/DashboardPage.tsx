@@ -18,7 +18,7 @@ import styles from './DashboardPage.module.css';
 function useLowStock(storeId: string) {
   return useLiveQuery(
     async () => {
-      const [products, stock, autoMin] = await Promise.all([db.products.filter((p) => !p.deleted_at && p.active).toArray(), getStockMap(storeId), getAutoMinMap(storeId)]);
+      const [products, stock, autoMin] = await Promise.all([db.products.filter((p) => !p.deleted_at && p.active && p.track_stock !== false).toArray(), getStockMap(storeId), getAutoMinMap(storeId)]);
       return products
         .map((p) => ({ product: p, qty: stock.get(p.id) ?? 0, min: effectiveMinStock(p, autoMin) }))
         .filter(({ qty, min }) => min > 0 && qty <= min)

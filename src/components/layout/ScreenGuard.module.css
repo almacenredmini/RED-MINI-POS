@@ -1,0 +1,23 @@
+/* Tapa toda la app hasta volver a pantalla completa. */
+.overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+}
+
+.box {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  max-width: 440px;
+  text-align: center;
+}
+
+.box h2 {
+  margin: 8px 0 0;
+  font-size: 1.4rem;
+}

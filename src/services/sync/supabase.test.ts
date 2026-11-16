@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanCredential, decodeLinkCode, encodeLinkCode, normalizeProjectUrl } from './config';
+import { cleanCredential, decodeLinkCode, encodeLinkCode, linkCodeProblem, normalizeProjectUrl } from './config';
 import { diagnoseConnection } from './diagnose';
 import { createSupabaseTransport, signIn } from './supabase';
 import { SyncAuthError, SyncNetworkError } from './transport';
@@ -121,5 +121,14 @@ describe('conexión con Supabase', () => {
     expect(decodeLinkCode(code)).toEqual(conn);
     expect(atob(code)).not.toContain('r1');
     expect(decodeLinkCode('no es un código')).toBeNull();
+    // Sin relleno y en base64url, como lo dejan algunas apps.
+    const raw = encodeLinkCode(conn);
+    expect(decodeLinkCode(raw.replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'))).toEqual(conn);
+    // Texto pegado de más antes o después del código.
+    expect(decodeLinkCode(`${raw}0 in `)).toEqual(conn);
+    expect(decodeLinkCode(`Código: ${raw}`)).toEqual(conn);
+    expect(linkCodeProblem('https://x.supabase.co')).toContain('dirección');
+    expect(linkCodeProblem('sb_publishable_ABC')).toContain('clave pública');
+    expect(linkCodeProblem(raw.slice(0, 20))).toContain('incompleto');
   });
 });

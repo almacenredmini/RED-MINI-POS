@@ -68,11 +68,41 @@ export function encodeLinkCode(conn: SupabaseConnection): string {
   return btoa(JSON.stringify({ url: normalizeProjectUrl(conn.url) ?? conn.url, anon_key: cleanCredential(conn.anon_key) }));
 }
 
-export function decodeLinkCode(code: string): SupabaseConnection | null {
-  try {
-    const parsed = JSON.parse(atob(cleanCredential(code))) as Partial<SupabaseConnection>;
-    return parsed.url && parsed.anon_key ? { url: cleanCredential(parsed.url), anon_key: cleanCredential(parsed.anon_key) } : null;
-  } catch {
-    return null;
+function tryDecode(clean: string): SupabaseConnection | null {
+  // Algunas apps pasan el código a "base64url" (- y _) o le sacan el relleno (=) del final.
+  const b64 = clean.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+  for (const attempt of [() => atob(padded), () => clean]) {
+    try {
+      const parsed = JSON.parse(attempt()) as Partial<SupabaseConnection>;
+      if (parsed.url && parsed.anon_key) return { url: cleanCredential(parsed.url), anon_key: cleanCredential(parsed.anon_key) };
+    } catch {
+      /* se prueba la siguiente forma */
+    }
   }
+  return null;
+}
+
+/**
+ * Lee el código aunque al copiarlo se le haya pegado texto antes o después
+ * (pasó en el celular: quedó "0 in " al final).
+ */
+export function decodeLinkCode(code: string): SupabaseConnection | null {
+  let clean = cleanCredential(code);
+  const start = clean.indexOf('eyJ');
+  if (start > 0) clean = clean.slice(start);
+  for (let cut = 0; cut <= 12 && cut < clean.length; cut++) {
+    const conn = tryDecode(clean.slice(0, clean.length - cut));
+    if (conn) return conn;
+  }
+  return null;
+}
+
+/** Por qué no sirve lo que pegaron en "Código de vinculación", para decirlo en palabras. */
+export function linkCodeProblem(code: string): string {
+  const clean = cleanCredential(code);
+  if (/supabase\.co|^https?:/i.test(clean)) return 'Eso es la dirección del proyecto, no el código. Pegala en "Dirección del proyecto", más abajo.';
+  if (/^sb_publishable_|^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(clean)) return 'Eso es la clave pública, no el código. Pegala en "Clave pública (anon)", más abajo.';
+  if (/^eyJ/.test(clean)) return 'El código está incompleto: se cortó al copiarlo. Volvé a tocar "Copiar código de vinculación" en el dispositivo vinculado y pegalo entero.';
+  return 'El código no es válido. Copialo de nuevo completo desde el dispositivo vinculado, o completá la dirección y la clave a mano.';
 }

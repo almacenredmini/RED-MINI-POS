@@ -7,6 +7,7 @@ import { recordCost } from './costs';
 import { logProductChange } from './productChanges';
 import { toSyncProduct } from './products';
 import { applyStockMovement } from './stock';
+import { tracksStock } from './products';
 
 const TABLES = [db.purchases, db.purchase_items, db.purchase_files, db.products, db.product_cost_history, db.product_changes, db.stock, db.stock_movements, db.sync_queue];
 
@@ -106,7 +107,9 @@ export async function savePurchase(input: PurchaseInput, opts: { id?: string | u
       await enqueue('purchase_items', item.id, 'upsert', item);
 
       if (opts.receive) {
-        await applyStockMovement({
+        // Stock ilimitado: la compra actualiza el costo pero no suma stock.
+        const tracked = tracksStock(await db.products.get(l.product_id));
+        if (tracked) await applyStockMovement({
           id: uuidv7(),
           store_id: input.store_id,
           product_id: l.product_id,

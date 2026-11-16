@@ -3,6 +3,7 @@ import { getDeviceId } from '../meta';
 import { nowISO, uuidv7 } from '@/services/id';
 import type { Product, StockMovement, UUID } from '@/types/domain';
 import { applyStockMovement } from './stock';
+import { tracksStock } from './products';
 import { stockKey } from './stores';
 
 const TABLES = [db.stock, db.stock_movements, db.sync_queue];
@@ -14,7 +15,7 @@ export class InventoryError extends Error {}
 interface ManualMovement {
   kind: ManualKind;
   storeId: UUID;
-  product: Pick<Product, 'id' | 'cost_cents'>;
+  product: Pick<Product, 'id' | 'cost_cents' | 'track_stock'>;
   /** Entrada/salida: unidades a mover. Conteo: cantidad real que hay en el local. */
   quantity: number;
   reason: string;
@@ -27,6 +28,7 @@ export async function registerManualMovement({ kind, storeId, product, quantity,
   if (!Number.isFinite(quantity)) throw new InventoryError('Ingresá una cantidad válida');
   if (kind !== 'count' && quantity <= 0) throw new InventoryError('La cantidad tiene que ser mayor a cero');
   if (kind === 'exit' && !reason.trim()) throw new InventoryError('Indicá el motivo de la salida');
+  if (!tracksStock(product)) throw new InventoryError('Este producto tiene stock ilimitado: no lleva movimientos de stock');
   const deviceId = await getDeviceId();
 
   return db.transaction('rw', TABLES, async () => {
@@ -56,7 +58,7 @@ export async function registerManualMovement({ kind, storeId, product, quantity,
 interface Transfer {
   fromStoreId: UUID;
   toStoreId: UUID;
-  product: Pick<Product, 'id' | 'cost_cents'>;
+  product: Pick<Product, 'id' | 'cost_cents' | 'track_stock'>;
   quantity: number;
   reason: string;
   userId: UUID | null;
@@ -66,6 +68,7 @@ interface Transfer {
 export async function transferStock({ fromStoreId, toStoreId, product, quantity, reason, userId }: Transfer): Promise<void> {
   if (!Number.isFinite(quantity) || quantity <= 0) throw new InventoryError('La cantidad tiene que ser mayor a cero');
   if (fromStoreId === toStoreId) throw new InventoryError('Elegí una sucursal de destino distinta');
+  if (!tracksStock(product)) throw new InventoryError('Este producto tiene stock ilimitado: no se transfiere');
   const deviceId = await getDeviceId();
   const transferId = uuidv7();
   const now = nowISO();
@@ -126,7 +129,7 @@ export async function stockValuation(storeId: UUID): Promise<{ units: number; co
   let costCents = 0;
   rows.forEach((r, i) => {
     const p = products[i];
-    if (!p || p.deleted_at || r.quantity <= 0) return;
+    if (!p || p.deleted_at || !tracksStock(p) || r.quantity <= 0) return;
     units += r.quantity;
     costCents += Math.round(r.quantity * p.cost_cents);
   });

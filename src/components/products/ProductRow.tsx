@@ -28,7 +28,7 @@ export function ProductRow({ product: p, categoryName, stock, showMargin, minSto
       </div>
       <div className={`${styles.col} ${styles.hideSm} num`}>
         <span className={styles.label}>Stock</span>
-        {low ? <Badge tone={stock <= 0 ? 'danger' : 'warning'}>{stock}</Badge> : stock}
+        {p.track_stock === false ? 'Ilimitado' : low ? <Badge tone={stock <= 0 ? 'danger' : 'warning'}>{stock}</Badge> : stock}
       </div>
       <div className={`${styles.price} num`}>
         {formatMoney(p.price_cents)}

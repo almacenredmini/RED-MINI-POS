@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { downloadCsv, pesos, toCsv } from '@/services/csv';
 import { BarChart, type Bar } from '@/components/reports/BarChart';
 import { SlowMoversCard } from '@/components/reports/SlowMovers';
+import { formatDuration, listScreenExits } from '@/database/repositories/screenExits';
 import { Card, StatCard } from '@/components/ui/Card';
 import { Input, Select } from '@/components/ui/Field';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -97,6 +98,7 @@ export function ReportsPage() {
   };
 
   const report = useLiveQuery(() => salesReport(scope, start.toISOString(), end.toISOString()), [scope, start.getTime(), end.getTime()]);
+  const exits = useLiveQuery(() => listScreenExits(scope, start.toISOString(), end.toISOString()), [scope, start.getTime(), end.getTime()], []);
   const stock = useLiveQuery(() => (showCost ? stockValue(scope) : Promise.resolve([])), [scope, showCost], []);
   const days = Math.round((end.getTime() - start.getTime()) / 86_400_000);
 
@@ -145,6 +147,36 @@ export function ReportsPage() {
       )}
 
       <SlowMoversCard storeId={scope} className={styles.block} />
+
+      <Card title={`Salidas de la pantalla de venta (${exits.length})`} className={styles.block}>
+        {exits.length === 0 ? (
+          <p className="muted">Nadie salió de la pantalla completa en este período.</p>
+        ) : (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Cuándo</th>
+                  <th>Quién</th>
+                  {!storeId && <th>Sucursal</th>}
+                  <th className="num">Tiempo afuera</th>
+                </tr>
+              </thead>
+              <tbody>
+                {exits.map((e) => (
+                  <tr key={e.id}>
+                    <td>{new Date(e.left_at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td>{e.user_name}</td>
+                    {!storeId && <td>{stores.find((s) => s.id === e.store_id)?.name ?? '—'}</td>}
+                    <td className="num">{formatDuration(e.seconds)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="muted">Minimizar, cambiar de programa o salir de pantalla completa, de quienes no tienen permiso para usar la PC libremente.</p>
+      </Card>
 
       {showCost && stock.length > 0 && (
         <Card title="Stock valorizado (hoy)" className={styles.block}>
@@ -208,7 +240,18 @@ function Report({ report, start, days, showCost, allStores }: { report: SalesRep
   return (
     <>
       <div className={styles.stats}>
-        <StatCard label="Ventas" value={formatMoney(report.total)} icon="pos" highlight foot={report.voided.count > 0 ? `${report.voided.count} anuladas, ${formatMoney(report.voided.total)}` : 'Sin anuladas'} />
+        <StatCard
+          label="Ventas"
+          value={formatMoney(report.total)}
+          icon="pos"
+          highlight
+          foot={[
+            report.voided.count > 0 ? `${report.voided.count} anuladas, ${formatMoney(report.voided.total)}` : 'Sin anuladas',
+            report.common.count > 0 ? `Sin contar ${report.common.count} productos comunes (${formatMoney(report.common.total)})` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        />
         <StatCard label="Tickets" value={report.tickets} icon="reports" foot={`Promedio ${formatMoney(report.tickets ? Math.round(report.total / report.tickets) : 0)}`} />
         {showCost && <StatCard label="Ganancia bruta" value={formatMoney(profit)} icon="cash" foot={`Margen ${pct(profit, report.total)}`} />}
         <StatCard label="Descuentos" value={formatMoney(report.discount)} icon="minus" foot="Ya restados de las ventas" />
@@ -232,11 +275,12 @@ function Report({ report, start, days, showCost, allStores }: { report: SalesRep
                   <tr key={m}>
                     <td>{PAYMENT_LABELS[m]}</td>
                     <td className="num">{formatMoney(v)}</td>
-                    <td className="num muted">{pct(v, report.total)}</td>
+                    <td className="num muted">{pct(v, report.total + report.common.total)}</td>
                   </tr>
                 ))}
             </tbody>
           </table>
+          {report.common.count > 0 && <p className="muted">Incluye lo cobrado por productos comunes ({formatMoney(report.common.total)}), porque es plata que entró a la caja.</p>}
         </Card>
         {allStores && report.byStore.length > 0 && <RankCard title="Por sucursal" rows={report.byStore} count="tickets" showCost={showCost} total={report.total} />}
         <RankCard title="Por cajero" rows={report.byUser} count="tickets" showCost={showCost} total={report.total} />

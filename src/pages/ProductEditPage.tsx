@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/database/db';
 import { deleteProduct, DuplicateBarcodeError, getProductBarcodes, saveProduct } from '@/database/repositories/products';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +24,7 @@ const EMPTY: ProductFormValues = {
   auto_min_stock: true,
   stock_delta: 0,
   active: true,
+  track_stock: true,
   barcodes: [],
   image: null,
 };
@@ -47,6 +49,7 @@ async function loadInitial(id: string | undefined, params: URLSearchParams): Pro
     auto_min_stock: p.auto_min_stock,
     stock_delta: 0,
     active: p.active,
+    track_stock: p.track_stock !== false,
     barcodes: codes.map((b) => b.code),
     image: image?.blob ?? null,
   };
@@ -87,6 +90,18 @@ export function ProductEditPage() {
   const initial = useInitialValues(id, params);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Stock actual a la vista apenas se abre el producto (se actualiza solo si alguien vende mientras tanto).
+  const stockNow = useLiveQuery(
+    async () => {
+      if (!id) return null;
+      const p = await db.products.get(id);
+      if (p?.track_stock === false) return 'Stock ilimitado';
+      const qty = (await db.stock.get(`${store.id}:${id}`))?.quantity ?? 0;
+      return `Stock actual en ${store.name}: ${String(Math.round(qty * 1000) / 1000).replace('.', ',')}`;
+    },
+    [id, store.id, store.name],
+    null,
+  );
 
   if (initial === undefined) return null;
   if (initial === null) {
@@ -126,6 +141,7 @@ export function ProductEditPage() {
     <>
       <PageHeader
         title={id ? initial.name || 'Editar producto' : 'Nuevo producto'}
+        {...(stockNow && { subtitle: stockNow })}
         actions={<Button variant="ghost" icon="back" onClick={goBack}>Volver</Button>}
       />
       <ProductForm

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { useSyncStatus } from '@/components/layout/SyncIndicator';
-import { cleanCredential, clearSyncConfig, decodeLinkCode, encodeLinkCode, getSyncConfig, LAST_SYNC_KEY, normalizeProjectUrl, saveSyncConfig } from '@/services/sync/config';
+import { cleanCredential, clearSyncConfig, decodeLinkCode, encodeLinkCode, getSyncConfig, LAST_SYNC_KEY, linkCodeProblem, normalizeProjectUrl, saveSyncConfig } from '@/services/sync/config';
 import { diagnoseConnection, type DiagnosticStep } from '@/services/sync/diagnose';
 import { requeueErrors, syncNow } from '@/services/sync/engine';
 import { signIn } from '@/services/sync/supabase';
@@ -72,7 +72,7 @@ function LinkForm() {
   return (
     <div className={styles.form}>
       <p className="muted">Conectá este dispositivo para que sus cambios lleguen a los demás. Las ventas siguen funcionando sin Internet.</p>
-      {code.trim() && !decodeLinkCode(code) && <p className={styles.error}>El código no es válido: copialo de nuevo completo desde el dispositivo vinculado.</p>}
+      {code.trim() && !decodeLinkCode(code) && <p className={styles.error}>{linkCodeProblem(code)}</p>}
       <Field label="Código de vinculación" hint="Si ya vinculaste otro dispositivo, copiá el código desde ahí y no hace falta completar la dirección ni la clave.">
         {(id) => <Input id={id} value={code} onChange={(e) => onCode(e.target.value)} autoComplete="off" />}
       </Field>

@@ -22,6 +22,9 @@ export interface SalesReport {
   cost: number;
   discount: number;
   voided: { count: number; total: number };
+  /** Productos comunes (inventados en el momento): no entran en ningún total del reporte, se informan aparte. */
+  common: { count: number; total: number };
+  /** Lo cobrado por medio de pago: incluye los productos comunes, porque es plata que entró a la caja. */
   byMethod: Partial<Record<Payment['method'], number>>;
   /** Clave `AAAA-MM-DD` en hora local. */
   byDay: Map<string, number>;
@@ -97,6 +100,7 @@ export async function salesLines(storeId: string | null, from: string, to: strin
   for (const s of sales) {
     const when = new Date(s.occurred_at);
     for (const i of (itemsBySale.get(s.id) ?? []).sort((a, b) => a.line - b.line)) {
+      if (!i.product_id) continue; // Producto común: no entra en los reportes.
       const share = s.subtotal_cents > 0 ? Math.round((i.total_cents * s.discount_cents) / s.subtotal_cents) : 0;
       const product = i.product_id ? productById.get(i.product_id) : undefined;
       const cat = product?.category_id;
@@ -138,10 +142,31 @@ export async function salesReport(storeId: string | null, from: string, to: stri
   const userName = new Map(users.map((u) => [u.id, u.name]));
   const storeName = new Map(stores.map((s) => [s.id, s.name]));
 
-  // El costo de una venta es el de sus ítems; el descuento general se reparte en proporción al total.
-  const costBySale = new Map<string, number>();
-  for (const i of items) costBySale.set(i.sale_id, (costBySale.get(i.sale_id) ?? 0) + Math.round(i.unit_cost_cents * i.quantity));
   const saleById = new Map(sales.map((s) => [s.id, s]));
+  // Parte del descuento general que le toca a un ítem, en proporción a su total.
+  const shareOf = (i: (typeof items)[number]) => {
+    const sale = saleById.get(i.sale_id);
+    return sale && sale.subtotal_cents > 0 ? Math.round((i.total_cents * sale.discount_cents) / sale.subtotal_cents) : 0;
+  };
+
+  // Los productos comunes (sin producto) quedan fuera de todos los totales y se informan aparte.
+  const commonBySale = new Map<string, number>();
+  const common = { count: 0, total: 0 };
+  for (const i of items) {
+    if (i.product_id) continue;
+    const amount = i.total_cents - shareOf(i);
+    commonBySale.set(i.sale_id, (commonBySale.get(i.sale_id) ?? 0) + amount);
+    common.count += 1;
+    common.total += amount;
+  }
+  const productItems = items.filter((i) => i.product_id);
+  const totalOf = (s: Sale) => s.total_cents - (commonBySale.get(s.id) ?? 0);
+  // Una venta hecha sólo con productos comunes no cuenta como ticket.
+  const counted = sales.filter((s) => productItems.some((i) => i.sale_id === s.id));
+
+  // El costo de una venta es el de sus ítems.
+  const costBySale = new Map<string, number>();
+  for (const i of productItems) costBySale.set(i.sale_id, (costBySale.get(i.sale_id) ?? 0) + Math.round(i.unit_cost_cents * i.quantity));
 
   const byMethod: SalesReport['byMethod'] = {};
   for (const p of payments) byMethod[p.method] = (byMethod[p.method] ?? 0) + p.amount_cents;
@@ -150,37 +175,36 @@ export async function salesReport(storeId: string | null, from: string, to: stri
   const byHour = Array.from({ length: 24 }, () => ({ total: 0, tickets: 0 }));
   const stores_ = new Map<string, Row>();
   const users_ = new Map<string, Row>();
-  for (const s of sales) {
+  for (const s of counted) {
     const cost = costBySale.get(s.id) ?? 0;
+    const total = totalOf(s);
     const day = localDay(s.occurred_at);
-    byDay.set(day, (byDay.get(day) ?? 0) + s.total_cents);
+    byDay.set(day, (byDay.get(day) ?? 0) + total);
     const h = byHour[new Date(s.occurred_at).getHours()]!;
-    h.total += s.total_cents;
+    h.total += total;
     h.tickets += 1;
-    bump(stores_, s.store_id, storeName.get(s.store_id) ?? 'Sucursal', { tickets: 1, total: s.total_cents, cost });
-    bump(users_, s.user_id ?? '-', s.user_id ? (userName.get(s.user_id) ?? 'Usuario borrado') : 'Sin usuario', { tickets: 1, total: s.total_cents, cost });
+    bump(stores_, s.store_id, storeName.get(s.store_id) ?? 'Sucursal', { tickets: 1, total, cost });
+    bump(users_, s.user_id ?? '-', s.user_id ? (userName.get(s.user_id) ?? 'Usuario borrado') : 'Sin usuario', { tickets: 1, total, cost });
   }
 
   const products_ = new Map<string, Row>();
   const categories_ = new Map<string, Row>();
-  for (const i of items) {
-    const sale = saleById.get(i.sale_id);
-    // Parte del descuento general que le toca a este ítem.
-    const share = sale && sale.subtotal_cents > 0 ? Math.round((i.total_cents * sale.discount_cents) / sale.subtotal_cents) : 0;
-    const total = i.total_cents - share;
+  for (const i of productItems) {
+    const total = i.total_cents - shareOf(i);
     const cost = Math.round(i.unit_cost_cents * i.quantity);
     const product = i.product_id ? productById.get(i.product_id) : undefined;
-    bump(products_, i.product_id ?? `libre:${i.description}`, product?.name ?? i.description, { quantity: i.quantity, total, cost });
+    bump(products_, i.product_id!, product?.name ?? i.description, { quantity: i.quantity, total, cost });
     const cat = product?.category_id ?? null;
     bump(categories_, cat ?? '-', cat ? (categoryName.get(cat) ?? 'Sin categoría') : 'Sin categoría', { quantity: i.quantity, total, cost });
   }
 
   return {
-    total: sales.reduce((t, s) => t + s.total_cents, 0),
-    tickets: sales.length,
+    total: counted.reduce((t, s) => t + totalOf(s), 0),
+    tickets: counted.length,
     cost: [...costBySale.values()].reduce((t, c) => t + c, 0),
-    discount: sales.reduce((t, s) => t + s.discount_cents, 0),
+    discount: productItems.reduce((t, i) => t + shareOf(i), 0),
     voided: { count: voided.length, total: voided.reduce((t, s) => t + s.total_cents, 0) },
+    common,
     byMethod,
     byDay,
     byHour,
@@ -214,7 +238,7 @@ export async function stockValue(storeId: string | null): Promise<StockValue[]> 
   const out = new Map<string, StockValue>();
   for (const s of stock) {
     const p = productById.get(s.product_id);
-    if (!p || p.deleted_at) continue;
+    if (!p || p.deleted_at || p.track_stock === false) continue;
     const row = out.get(s.store_id) ?? { storeId: s.store_id, storeName: stores.find((x) => x.id === s.store_id)?.name ?? 'Sucursal', units: 0, products: 0, cost: 0, price: 0, negative: 0 };
     if (s.quantity < 0) row.negative += 1;
     else if (s.quantity > 0) {
@@ -281,7 +305,7 @@ export async function slowMovers(storeId: string | null, days: number, maxSold =
   const category = new Map(categories.map((c) => [c.id, c]));
   const out: SlowMover[] = [];
   for (const p of products) {
-    if (p.deleted_at || !p.active) continue;
+    if (p.deleted_at || !p.active || p.track_stock === false) continue;
     const stockQty = qty.get(p.id) ?? 0;
     const soldQty = Math.max(0, sold.get(p.id) ?? 0);
     if (stockQty <= 0 || soldQty > maxSold) continue;

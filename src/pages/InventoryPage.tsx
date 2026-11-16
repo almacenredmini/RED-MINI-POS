@@ -53,10 +53,10 @@ function StockTab({ onProduct }: { onProduct: (p: Product) => void }) {
               <button key={p.id} type="button" className={styles.row} onClick={() => onProduct(p)}>
                 <span className={styles.rowMain}>
                   <strong>{p.name}</strong>
-                  <span className="muted num">Mínimo {min}</span>
+                  <span className="muted num">{p.track_stock === false ? 'Stock ilimitado' : `Mínimo ${min}`}</span>
                 </span>
                 <span className={`${styles.rowEnd} num`}>
-                  {qty <= 0 ? <Badge tone="danger">{qty}</Badge> : min > 0 && qty <= min ? <Badge tone="warning">{qty}</Badge> : qty}
+                  {p.track_stock === false ? '∞' : qty <= 0 ? <Badge tone="danger">{qty}</Badge> : min > 0 && qty <= min ? <Badge tone="warning">{qty}</Badge> : qty}
                 </span>
               </button>
             );

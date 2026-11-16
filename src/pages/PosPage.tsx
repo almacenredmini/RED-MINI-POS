@@ -18,7 +18,8 @@ import { CartLines } from '@/components/pos/CartLines';
 import { DiscountModal } from '@/components/pos/DiscountModal';
 import { PaymentModal } from '@/components/pos/PaymentModal';
 import { ProductSearchModal } from '@/components/pos/ProductSearchModal';
-import { addLine, cartTotals, changeQuantity, EMPTY_CART, removeLine } from '@/services/cart';
+import { addCommonLine, addLine, cartTotals, changeQuantity, EMPTY_CART, removeLine } from '@/services/cart';
+import { CommonProductModal } from '@/components/pos/CommonProductModal';
 import { uuidv7 } from '@/services/id';
 import { formatMoney } from '@/services/money';
 import type { PaymentDraft } from '@/services/payment';
@@ -26,7 +27,7 @@ import { printHtml, renderTicketHtml } from '@/services/ticket';
 import type { Product } from '@/types/domain';
 import styles from '@/components/pos/Pos.module.css';
 
-type Dialog = 'search' | 'pay' | 'discount' | 'camera' | null;
+type Dialog = 'search' | 'pay' | 'discount' | 'camera' | 'common' | null;
 
 /** Un lector escribe mucho más rápido: un + o - pegado a otra tecla es parte de un código, no un atajo. */
 const MIN_MANUAL_KEY_GAP_MS = 120;
@@ -174,6 +175,7 @@ export function PosPage() {
             setDialog('search');
           }),
           F12: whenIdle(openPayment),
+          'ctrl+p': whenIdle(() => setDialog('common')),
           '+': manualKey(() => selected && setCart((c) => changeQuantity(c, selected.product_id, 1))),
           '-': manualKey(() => selected && setCart((c) => changeQuantity(c, selected.product_id, -1))),
           ArrowUp: whenIdle(() => moveSelection(-1)),
@@ -208,6 +210,9 @@ export function PosPage() {
           </Button>
           <Button icon="scan" onClick={() => setDialog('camera')}>
             Cámara
+          </Button>
+          <Button icon="plus" onClick={() => setDialog('common')}>
+            Producto común <kbd className={styles.kbd}>Ctrl+P</kbd>
           </Button>
           {cart.lines.length > 0 && (
             <Button variant="ghost" icon="trash" onClick={clearCart}>
@@ -266,6 +271,16 @@ export function PosPage() {
           onPick={(p) => {
             void db.barcodes.where('product_id').equals(p.id).first().then((b) => addProduct(p, b?.code ?? null));
             setDialog(null);
+          }}
+        />
+      )}
+      {dialog === 'common' && (
+        <CommonProductModal
+          onClose={() => setDialog(null)}
+          onAdd={(name, price) => {
+            const id = uuidv7();
+            setCart((c) => addCommonLine(c, name, price, id));
+            setSelectedId(`comun:${id}`);
           }}
         />
       )}

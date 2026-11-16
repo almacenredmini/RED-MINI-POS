@@ -13,7 +13,9 @@ export function useHotkeys(map: HotkeyMap) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const handler = ref.current[e.key];
+      // Con Ctrl (o Cmd en Mac) el atajo se nombra "ctrl+p"; sin modificador, por la tecla sola.
+      const ctrl = e.ctrlKey || e.metaKey;
+      const handler = ctrl ? ref.current[`ctrl+${e.key.toLowerCase()}`] : ref.current[e.key];
       if (!handler) return;
       if (e.repeat) return e.preventDefault();
       if (handler(e) !== false) e.preventDefault();
