@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCurrentStore } from '@/contexts/DeviceContext';
 import { listPurchases } from '@/database/repositories/purchases';
 import { listSuppliers } from '@/database/repositories/suppliers';
+import { listInvoices } from '@/database/repositories/supplierInvoices';
 import { SupplierModal } from '@/components/purchases/SupplierModal';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -13,6 +14,8 @@ import { formatMoney } from '@/services/money';
 import type { PurchaseStatus, Supplier } from '@/types/domain';
 import styles from '@/components/inventory/Inventory.module.css';
 
+type Tab = 'purchases' | 'invoices' | 'suppliers';
+
 const STATUS: Record<PurchaseStatus, { label: string; tone: 'accent' | 'success' | 'neutral' }> = {
   draft: { label: 'Borrador', tone: 'accent' },
   received: { label: 'Recibida', tone: 'success' },
@@ -21,7 +24,10 @@ const STATUS: Record<PurchaseStatus, { label: string; tone: 'accent' | 'success'
 
 export function PurchasesPage() {
   const store = useCurrentStore();
-  const [tab, setTab] = useState<'purchases' | 'suppliers'>('purchases');
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = params.get('tab') === 'boletas' ? 'invoices' : params.get('tab') === 'proveedores' ? 'suppliers' : 'purchases';
+  const setTab = (t: Tab) => setParams(t === 'purchases' ? {} : { tab: t === 'invoices' ? 'boletas' : 'proveedores' }, { replace: true });
+  const invoices = useLiveQuery(() => listInvoices(store.id), [store.id], []);
   // undefined = cerrado, null = proveedor nuevo.
   const [editing, setEditing] = useState<Supplier | null | undefined>(undefined);
   const purchases = useLiveQuery(() => listPurchases(store.id), [store.id], []);
@@ -36,6 +42,8 @@ export function PurchasesPage() {
         actions={
           tab === 'purchases' ? (
             <ButtonLink to="/compras/nueva" variant="primary" icon="plus">Nueva compra</ButtonLink>
+          ) : tab === 'invoices' ? (
+            <ButtonLink to="/compras/boletas/nueva" variant="primary" icon="plus">Nueva boleta</ButtonLink>
           ) : (
             <Button variant="primary" icon="plus" onClick={() => setEditing(null)}>Nuevo proveedor</Button>
           )
@@ -45,13 +53,39 @@ export function PurchasesPage() {
         <button type="button" role="tab" aria-selected={tab === 'purchases'} className={`${styles.tab} ${tab === 'purchases' ? styles.tabActive : ''}`} onClick={() => setTab('purchases')}>
           Compras
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'invoices'} className={`${styles.tab} ${tab === 'invoices' ? styles.tabActive : ''}`} onClick={() => setTab('invoices')}>
+          Boletas
+        </button>
         <button type="button" role="tab" aria-selected={tab === 'suppliers'} className={`${styles.tab} ${tab === 'suppliers' ? styles.tabActive : ''}`} onClick={() => setTab('suppliers')}>
           Proveedores
         </button>
       </div>
 
       <Card className={styles.table}>
-        {tab === 'purchases' ? (
+        {tab === 'invoices' ? (
+          invoices.length === 0 ? (
+            <EmptyState icon="purchases" title="Todavía no hay boletas">
+              Guardá las boletas de tus proveedores para tener el control. No cambian el stock ni los costos.
+            </EmptyState>
+          ) : (
+            invoices.map((inv) => {
+              return (
+                <Link key={inv.id} to={`/compras/boletas/${inv.id}`} className={styles.row}>
+                  <span className={styles.rowMain}>
+                    <strong>{inv.supplier_name}</strong>
+                    <span className="muted num">
+                      {inv.issued_on ? new Date(`${inv.issued_on}T12:00`).toLocaleDateString('es-AR') : 'Sin fecha'}
+                      {inv.number ? ` · ${inv.number}` : ''} · {inv.items.length} artículos
+                    </span>
+                  </span>
+                  <span className={`${styles.rowEnd} num`}>
+                    {inv.total_cents !== null ? formatMoney(inv.total_cents) : ''}
+                  </span>
+                </Link>
+              );
+            })
+          )
+        ) : tab === 'purchases' ? (
           purchases.length === 0 ? (
             <EmptyState icon="purchases" title="Todavía no hay compras" />
           ) : (

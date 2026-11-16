@@ -41,7 +41,9 @@
   --menubar-h: 56px;
   --bottomnav-h: 64px;
   /* Alto del encabezado fijo: lo usan los elementos que se quedan pegados debajo al hacer scroll. */
-  --header-h: calc(var(--topbar-h) + env(safe-area-inset-top));
+  --header-h: calc(var(--topbar-h) + var(--storebar-h) + env(safe-area-inset-top));
+  /* Fila de la sucursal, sólo en celular. */
+  --storebar-h: 44px;
 
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 

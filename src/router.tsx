@@ -21,6 +21,7 @@ const PurchaseEditPage = lazy(() => import('@/pages/PurchaseEditPage').then((m) 
 const PurchasesPage = lazy(() => import('@/pages/PurchasesPage').then((m) => ({ default: m.PurchasesPage })));
 const CashPage = lazy(() => import('@/pages/CashPage').then((m) => ({ default: m.CashPage })));
 const SchedulesPage = lazy(() => import('@/pages/SchedulesPage').then((m) => ({ default: m.SchedulesPage })));
+const SupplierInvoicePage = lazy(() => import('@/pages/SupplierInvoicePage').then((m) => ({ default: m.SupplierInvoicePage })));
 
 /**
  * HashRouter: GitHub Pages no permite reescribir rutas al index.html.
@@ -46,6 +47,8 @@ export const router = createHashRouter([
       { path: 'cuentas', element: <RequirePermission permission="accounts.manage"><AccountsPage /></RequirePermission> },
       { path: 'inventario', element: <RequirePermission permission="stock.adjust"><InventoryPage /></RequirePermission> },
       { path: 'compras', element: <RequirePermission permission="purchases.manage"><PurchasesPage /></RequirePermission> },
+      { path: 'compras/boletas/nueva', element: <RequirePermission permission="purchases.manage"><SupplierInvoicePage /></RequirePermission> },
+      { path: 'compras/boletas/:id', element: <RequirePermission permission="purchases.manage"><SupplierInvoicePage /></RequirePermission> },
       { path: 'compras/nueva', element: <RequirePermission permission="purchases.manage"><PurchaseEditPage /></RequirePermission> },
       { path: 'compras/:id', element: <RequirePermission permission="purchases.manage"><PurchaseEditPage /></RequirePermission> },
       {

@@ -9,7 +9,7 @@ import type {
   MetaEntry,
   Product,
   ProductChange,
-  StaffSchedule,
+  StaffSchedule, SupplierInvoice,
   ProductCost,
   Payment,
   ProductImage,
@@ -56,6 +56,7 @@ export class RedMiniDB extends Dexie {
   product_cost_history!: EntityTable<ProductCost, 'id'>;
   product_changes!: EntityTable<ProductChange, 'id'>;
   staff_schedules!: EntityTable<StaffSchedule, 'id'>;
+  supplier_invoices!: EntityTable<SupplierInvoice, 'id'>;
   employee_accounts!: EntityTable<EmployeeAccount, 'id'>;
   account_movements!: EntityTable<AccountMovement, 'id'>;
   cash_sessions!: EntityTable<CashSession, 'id'>;
@@ -112,6 +113,9 @@ export class RedMiniDB extends Dexie {
     });
     this.version(8).stores({
       staff_schedules: 'id, store_id, name',
+    });
+    this.version(9).stores({
+      supplier_invoices: 'id, store_id, issued_on',
     });
   }
 }

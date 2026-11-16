@@ -85,8 +85,10 @@ export function AppShell() {
       <header className={styles.header}>
         <div className={styles.topbar}>
           <Logo />
-          <div className={styles.topbarRight}>
+          <div className={styles.topbarStore}>
             <StoreSwitcher />
+          </div>
+          <div className={styles.topbarRight}>
             <SyncIndicator compact />
             <span className={styles.userName}>{user.name}</span>
             <ExitButton />

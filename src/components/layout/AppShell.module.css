@@ -30,6 +30,47 @@
   gap: 10px;
 }
 
+/* PC: la sucursal va a la derecha, junto al estado y Salir. */
+.topbarStore {
+  display: flex;
+  margin-left: auto;
+  margin-right: 10px;
+}
+
+/* Celular: la sucursal pasa a una segunda fila, centrada y con el nombre completo. */
+@media (max-width: 899px) {
+  .topbar {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: var(--topbar-h) var(--storebar-h);
+    grid-template-areas:
+      'logo right'
+      'store store';
+    height: auto;
+  }
+
+  .topbar > :first-child {
+    grid-area: logo;
+    align-self: center;
+  }
+
+  .topbarRight {
+    grid-area: right;
+    justify-self: end;
+  }
+
+  .topbarStore {
+    grid-area: store;
+    justify-content: center;
+    align-items: flex-start;
+    margin: 0;
+  }
+
+  .topbarStore .storeSelect {
+    max-width: 200px;
+  }
+}
+
 .userName {
   display: none;
   font-size: 0.85rem;
@@ -310,18 +351,6 @@
     min-width: 0;
   }
 
-  .topbarRight .storeChip {
-    padding: 4px 8px;
-    min-width: 0;
-  }
-
-  .topbarRight .storeChip svg {
-    display: none;
-  }
-
-  .topbarRight .storeSelect {
-    max-width: 76px;
-  }
 }
 
 /* Secciones sin permiso: se ven, pero apagadas y con candado. */

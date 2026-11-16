@@ -83,6 +83,27 @@ export interface StaffSchedule extends SyncMeta {
   notes: string | null;
 }
 
+/** Un artículo de una boleta de proveedor, tal como figura impreso. No se vincula con los productos. */
+export interface SupplierInvoiceItem {
+  name: string;
+  quantity: number;
+  unit_cents: Cents;
+}
+
+/** Boleta de proveedor: un registro para control. No toca stock ni costos, y la foto nunca se guarda. */
+export interface SupplierInvoice extends SyncMeta {
+  id: UUID;
+  store_id: UUID;
+  supplier_id: UUID | null;
+  supplier_name: string;
+  /** "AAAA-MM-DD" */
+  issued_on: string | null;
+  number: string | null;
+  total_cents: Cents | null;
+  items: SupplierInvoiceItem[];
+  user_id: UUID | null;
+}
+
 export type ProductChangeAction = 'created' | 'updated' | 'deleted';
 /** De dónde vino el cambio. */
 export type ProductChangeSource = 'manual' | 'import' | 'purchase' | 'bulk_price';
@@ -153,7 +174,7 @@ export interface SyncQueueEntry {
   created_at: ISODate;
 }
 
-export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules';
+export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices';
 
 export type UserRole = 'owner' | 'manager' | 'employee';
 
