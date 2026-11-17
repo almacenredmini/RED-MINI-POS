@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useAuth } from '@/contexts/AuthContext';
 import { searchProducts } from '@/database/repositories/products';
 import { getStockMap } from '@/database/repositories/stores';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -17,6 +18,8 @@ interface Props {
 }
 
 export function ProductSearchModal({ storeId, initialQuery = '', onPick, onClose }: Props) {
+  const { can } = useAuth();
+  const showStock = can('stock.view');
   const [query, setQuery] = useState(initialQuery);
   const [cursor, setCursor] = useState(0);
   const q = useDebounce(query, 80);
@@ -62,7 +65,7 @@ export function ProductSearchModal({ storeId, initialQuery = '', onPick, onClose
             <button type="button" className={`${styles.result} ${i === cursor ? styles.resultActive : ''}`} onClick={() => onPick(p)}>
               <span className={styles.resultName}>
                 <strong>{p.name}</strong>
-                <span className="muted">{p.track_stock === false ? 'Stock ilimitado' : `Stock ${stock.get(p.id) ?? 0}`}</span>
+                {showStock && <span className="muted">{p.track_stock === false ? 'Stock ilimitado' : `Stock ${stock.get(p.id) ?? 0}`}</span>}
               </span>
               <span className={`${styles.resultPrice} num`}>{formatMoney(p.price_cents)}</span>
             </button>

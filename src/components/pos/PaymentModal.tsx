@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useAuth } from '@/contexts/AuthContext';
 import { listAccounts } from '@/database/repositories/accounts';
 import { useHotkeys } from '@/hooks/useHotkeys';
 import { Button } from '@/components/ui/Button';
@@ -49,12 +50,15 @@ export function PaymentModal({ total: fullTotal, promo = null, canRemovePromo = 
   const [busy, setBusy] = useState(false);
   // Ref y no sólo estado: dos F1 seguidos llegan antes de que React vuelva a renderizar.
   const submitting = useRef(false);
+  const showBalance = useAuth().can('accounts.view_balance');
 
   const cash = cashText.trim() === '' ? null : parseMoney(cashText);
   const account = accounts.find((a) => a.id === accountId);
   const overLimit = mode === 'account' && account !== undefined && total > account.available_cents;
   const computed = computePayment(mode, total, cash, accountId || null);
-  const result = overLimit ? { ...computed, error: `Supera el límite: le quedan ${formatMoney(Math.max(0, account.available_cents))}` } : computed;
+  const result = overLimit
+    ? { ...computed, error: showBalance ? `Supera el límite: le quedan ${formatMoney(Math.max(0, account.available_cents))}` : 'Supera el límite de la cuenta' }
+    : computed;
 
   const confirm = async (print: boolean) => {
     if (result.error || submitting.current) return;
@@ -152,7 +156,7 @@ export function PaymentModal({ total: fullTotal, promo = null, canRemovePromo = 
                   <option value="">Elegí un empleado</option>
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.name} · le quedan {formatMoney(Math.max(0, a.available_cents))}
+                      {showBalance ? `${a.name} · le quedan ${formatMoney(Math.max(0, a.available_cents))}` : a.name}
                     </option>
                   ))}
                 </Select>
