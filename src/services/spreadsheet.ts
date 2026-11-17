@@ -182,3 +182,39 @@ export async function readSheet(file: Blob): Promise<unknown[][]> {
 export async function readSpreadsheet(file: Blob): Promise<ImportRow[]> {
   return parseImportRows(await readSheet(file));
 }
+
+/** Una fila del Excel para comparar contra el inventario: no se guarda nada. */
+export interface CompareRow {
+  row: number;
+  name: string;
+  code: string | null;
+  quantity: number | null;
+  price_cents: Cents | null;
+  errors: string[];
+}
+
+/** Para comparar alcanza con identificar el producto (código o nombre); cantidad y precio son opcionales. */
+export function parseCompareRows(matrix: unknown[][], mapping: SheetMapping): CompareRow[] {
+  const { headerIndex, columns } = mapping;
+  if (columns.name === undefined && columns.code === undefined) throw new SpreadsheetError('Falta indicar la columna de Código de barra o de Nombre.');
+  const cell = (cells: unknown[], column: Column) => {
+    const index = columns[column];
+    return index === undefined ? undefined : cells[index];
+  };
+  const rows: CompareRow[] = [];
+  matrix.slice(headerIndex + 1).forEach((cells, i) => {
+    if (cells.every((c) => c === null || c === undefined || String(c).trim() === '')) return;
+    const errors: string[] = [];
+    const name = String(cell(cells, 'name') ?? '').trim();
+    const rawCode = cell(cells, 'code');
+    const code = rawCode === null || rawCode === undefined ? '' : String(rawCode).trim();
+    if (!name && !code) errors.push('Sin código ni nombre');
+    const quantity = quantityCell(cell(cells, 'quantity'));
+    if (quantity === undefined) errors.push('Cantidad inválida');
+    const rawPrice = cell(cells, 'price');
+    const price = moneyCell(rawPrice);
+    if (rawPrice !== null && rawPrice !== undefined && rawPrice !== '' && price === null) errors.push('Precio inválido');
+    rows.push({ row: headerIndex + i + 2, name, code: code || null, quantity: quantity ?? null, price_cents: price, errors });
+  });
+  return rows;
+}

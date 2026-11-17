@@ -5,14 +5,13 @@ import { useToast } from '@/contexts/ToastContext';
 import { importProducts, previewImport, type ImportAction } from '@/database/repositories/productImport';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { formatMoney } from '@/services/money';
-import { assignColumn, columnLetter, FIELD_LABELS, guessMapping, parseImportRows, readSheet, SpreadsheetError, type ImportField, type SheetMapping } from '@/services/spreadsheet';
+import { FIELD_LABELS, guessMapping, parseImportRows, readSheet, SpreadsheetError, type ImportField, type SheetMapping } from '@/services/spreadsheet';
+import { SheetColumns } from './SheetColumns';
 import styles from './Inventory.module.css';
 
 const PREVIEW_ROWS = 30;
-const HEADER_OPTIONS = 15;
 const FIELDS = Object.keys(FIELD_LABELS) as ImportField[];
 
 export function ImportModal({ onClose }: { onClose: () => void }) {
@@ -69,11 +68,6 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const columnCount = matrix ? Math.max(0, ...matrix.map((r) => r.length)) : 0;
-  const header = matrix && mapping.headerIndex >= 0 ? matrix[mapping.headerIndex] : undefined;
-  const samples = matrix ? matrix.slice(mapping.headerIndex + 1, mapping.headerIndex + 3) : [];
-  const fieldOf = (column: number) => FIELDS.find((f) => mapping.columns[f] === column) ?? '';
-
   const invalid = rows.filter((r) => r.errors.length > 0);
   const validRows = rows.filter((r) => r.errors.length === 0);
   const toCreate = [...actions.values()].filter((a) => a === 'create').length;
@@ -105,43 +99,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
 
         {matrix && (
           <>
-            <label className={styles.headerPick}>
-              <span>Los títulos están en</span>
-              <Select value={mapping.headerIndex} onChange={(e) => setMapping((m) => ({ ...m, headerIndex: Number(e.target.value) }))} aria-label="Fila de títulos">
-                <option value={-1}>No tiene títulos</option>
-                {matrix.slice(0, HEADER_OPTIONS).map((_, i) => (
-                  <option key={i} value={i}>
-                    Fila {i + 1}
-                  </option>
-                ))}
-              </Select>
-            </label>
-
-            <ul className={styles.columns}>
-              {Array.from({ length: columnCount }, (_, column) => (
-                <li key={column}>
-                  <span className={styles.columnInfo}>
-                    <strong>
-                      Columna {columnLetter(column)}
-                      {header?.[column] != null && header[column] !== '' ? ` · ${String(header[column])}` : ''}
-                    </strong>
-                    <span className="muted num">{samples.map((r) => String(r[column] ?? '—')).join(' / ') || '—'}</span>
-                  </span>
-                  <Select
-                    aria-label={`Qué es la columna ${columnLetter(column)}`}
-                    value={fieldOf(column)}
-                    onChange={(e) => setMapping((m) => ({ ...m, columns: assignColumn(m.columns, column, (e.target.value || null) as ImportField | null) }))}
-                  >
-                    <option value="">No usar</option>
-                    {FIELDS.map((f) => (
-                      <option key={f} value={f}>
-                        {FIELD_LABELS[f]}
-                      </option>
-                    ))}
-                  </Select>
-                </li>
-              ))}
-            </ul>
+            <SheetColumns matrix={matrix} mapping={mapping} setMapping={setMapping} fields={FIELDS} />
 
             {missing.length > 0 && <p className={styles.error}>Falta elegir: {missing.map((f) => FIELD_LABELS[f]).join(' y ')}.</p>}
           </>

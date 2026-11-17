@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../db';
-import { addDayTask, addTemplate, listDayTasks, listTemplates, moveTemplate, removeTemplate, setTaskDone } from './tasks';
+import { addDayTask, addTemplate, assignTask, listDayTasks, listTemplates, moveTemplate, removeTemplate, setTaskDone, weekKey } from './tasks';
 
 const store = 'store-1';
 const ana = { id: 'u1', name: 'Ana' };
@@ -61,5 +61,50 @@ describe('pendientes del día', () => {
     const [a] = await listTemplates(store);
     await moveTemplate(store, a!.id, 1);
     expect((await listTemplates(store)).map((t) => t.title)).toEqual(['B', 'A']);
+  });
+
+  it('la semana empieza el lunes', () => {
+    expect(weekKey('2026-11-16')).toBe('2026-11-16'); // lunes
+    expect(weekKey('2026-11-22')).toBe('2026-11-16'); // domingo
+    expect(weekKey('2026-11-23')).toBe('2026-11-23');
+  });
+
+  it('cada semana rota sola: cada uno pasa a lo del siguiente', async () => {
+    for (const t of ['Heladeras', 'Vidrieras', 'Barrer', 'Reponer']) await addTemplate(store, t);
+    const [h, v, b, r] = await listTemplates(store);
+    const juan = { userId: 'u1', name: 'Juan' };
+    const pedro = { userId: 'u2', name: 'Pedro' };
+    const sofi = { userId: 'u3', name: 'Sofi' };
+    // Semana del 16: Juan hace dos, Pedro una, Sofi una.
+    await assignTask(store, '2026-11-16', h!.id, juan);
+    await assignTask(store, '2026-11-16', v!.id, juan);
+    await assignTask(store, '2026-11-16', b!.id, pedro);
+    await assignTask(store, '2026-11-16', r!.id, sofi);
+    const names = async (day: string) => (await listDayTasks(store, day)).map((t) => t.assignedName);
+
+    expect(await names('2026-11-20')).toEqual(['Juan', 'Juan', 'Pedro', 'Sofi']);
+    expect(await names('2026-11-23')).toEqual(['Pedro', 'Pedro', 'Sofi', 'Juan']);
+    expect(await names('2026-11-30')).toEqual(['Sofi', 'Sofi', 'Juan', 'Pedro']);
+    expect(await names('2026-12-07')).toEqual(['Juan', 'Juan', 'Pedro', 'Sofi']);
+    // Antes de la primera asignación no hay nadie.
+    expect(await names('2026-11-09')).toEqual([null, null, null, null]);
+  });
+
+  it('un cambio a mano pisa la rotación de esa semana y sigue rotando desde ahí', async () => {
+    await addTemplate(store, 'A');
+    await addTemplate(store, 'B');
+    const [a, b] = await listTemplates(store);
+    await assignTask(store, '2026-11-16', a!.id, { userId: 'u1', name: 'Juan' });
+    await assignTask(store, '2026-11-16', b!.id, { userId: 'u2', name: 'Pedro' });
+    // La semana del 23 Juan falta: B también la hace Pedro.
+    await assignTask(store, '2026-11-23', b!.id, { userId: 'u2', name: 'Pedro' });
+    const names = async (day: string) => (await listDayTasks(store, day)).map((t) => t.assignedName);
+    expect(await names('2026-11-23')).toEqual(['Pedro', 'Pedro']);
+    // Con una sola persona no hay a quién rotar: sigue Pedro.
+    expect(await names('2026-11-30')).toEqual(['Pedro', 'Pedro']);
+    // Se vuelve a repartir y desde ahí rota otra vez.
+    await assignTask(store, '2026-12-07', a!.id, { userId: 'u1', name: 'Juan' });
+    expect(await names('2026-12-07')).toEqual(['Juan', 'Pedro']);
+    expect(await names('2026-12-14')).toEqual(['Pedro', 'Juan']);
   });
 });

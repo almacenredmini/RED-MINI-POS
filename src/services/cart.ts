@@ -11,9 +11,13 @@ export interface CartLine {
   unit_cost_cents: Cents;
   /** Producto común: se inventa en el momento, no toca stock y no entra en los reportes. */
   common?: boolean;
+  /** Con promo por cantidad: precio normal (unit_price_cents ya es el de la promo). No se guarda en el carrito. */
+  list_price_cents?: Cents;
+  promo_text?: string;
 }
 
-export type CartDiscount = { type: 'pct' | 'amount'; value: number };
+/** `label`: de dónde salió (la promo de efectivo); sin label es un descuento manual. */
+export type CartDiscount = { type: 'pct' | 'amount'; value: number; label?: string };
 
 export interface Cart {
   lines: CartLine[];

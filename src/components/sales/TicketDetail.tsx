@@ -114,7 +114,7 @@ export function TicketDetail({ saleId }: { saleId: string }) {
           );
         })}
       </ul>
-      {sale.discount_cents > 0 && <p className="muted num">Descuento: -{formatMoney(sale.discount_cents)}</p>}
+      {sale.discount_cents > 0 && <p className="muted num">{sale.discount_label ?? 'Descuento'}: -{formatMoney(sale.discount_cents)}</p>}
       <p className={`${styles.total} num`}>{formatMoney(sale.total_cents)}</p>
       <p className="muted">{payments.map((p) => `${PAYMENT_LABELS[p.method]} ${formatMoney(p.amount_cents)}`).join(' + ')}</p>
 

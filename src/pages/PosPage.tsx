@@ -16,7 +16,13 @@ import { EmptyState } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Field';
 import { CartLines } from '@/components/pos/CartLines';
 import { DiscountModal } from '@/components/pos/DiscountModal';
-import { PaymentModal } from '@/components/pos/PaymentModal';
+import { PaymentModal, type PromoOffer } from '@/components/pos/PaymentModal';
+import { listPromos } from '@/database/repositories/cashPromos';
+import { listProductPromos } from '@/database/repositories/productPromos';
+import { dayKey } from '@/database/repositories/tasks';
+import { withProductPromos } from '@/services/productPromo';
+import { currentPromo, promoBase, promoDiscount, promoLabel } from '@/services/cashPromo';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { ProductSearchModal } from '@/components/pos/ProductSearchModal';
 import { addCommonLine, addLine, cartTotals, changeQuantity, EMPTY_CART, removeLine } from '@/services/cart';
 import { CommonProductModal } from '@/components/pos/CommonProductModal';
@@ -58,7 +64,33 @@ export function PosPage() {
     box.current?.focus();
   }, []);
 
-  const totals = cartTotals(cart);
+  // Promos por cantidad: el carrito guarda el precio normal y el precio promo se aplica al mostrar y al vender.
+  const productPromos = useLiveQuery(() => listProductPromos(store.id), [store.id], []);
+  const priced = withProductPromos(cart, productPromos, dayKey());
+  const totals = cartTotals(priced);
+  const promos = useLiveQuery(() => listPromos(store.id), [store.id], []);
+  // La promo de efectivo no se suma a un descuento manual. Se evalúa en cada render: vale el día y la hora de ahora.
+  const promoNow = cart.discount ? null : currentPromo(promos);
+  // Categoría de cada producto del carrito: las excluidas de la promo (ej. cigarrillos) van a precio lleno.
+  const productIds = cart.lines.filter((l) => !l.common).map((l) => l.product_id).join(',');
+  const lineCategory = useLiveQuery(
+    async () => {
+      const ids = productIds ? productIds.split(',') : [];
+      const found = await db.products.bulkGet(ids);
+      return new Map(found.flatMap((p) => (p ? [[p.id, p.category_id] as const] : [])));
+    },
+    [productIds],
+    new Map<string, string | null>(),
+  );
+  const excludedNames = useLiveQuery(
+    async () => (promoNow?.excluded_category_ids?.length ? (await db.categories.bulkGet(promoNow.excluded_category_ids)).flatMap((c) => (c ? [c.name] : [])) : []),
+    [promoNow?.id, promoNow?.excluded_category_ids?.join(',')],
+    [],
+  );
+  const promoAmount = promoNow ? promoDiscount(promoBase(priced.lines, (id) => lineCategory.get(id), promoNow), promoNow) : 0;
+  const hasExcluded = !!promoNow?.excluded_category_ids?.length && cart.lines.some((l) => promoNow.excluded_category_ids!.includes(lineCategory.get(l.product_id) ?? ''));
+  const promo: PromoOffer | null =
+    promoNow && promoAmount > 0 ? { label: promoLabel(promoNow), discount: promoAmount, note: hasExcluded ? `Sin promo: ${excludedNames.join(', ')}` : null } : null;
   const canDiscount = can('sales.discount');
   const canReturn = can('sales.void');
   const selected = cart.lines.find((l) => l.product_id === selectedId) ?? cart.lines.at(-1) ?? null;
@@ -99,9 +131,10 @@ export function PosPage() {
     setDialog('pay');
   };
 
-  const closeSale = async (payments: PaymentDraft[], print: boolean) => {
+  const closeSale = async (payments: PaymentDraft[], print: boolean, applied: PromoOffer | null) => {
     try {
-      const detail = await createSale({ id: saleId, store, userId: user?.id ?? null, cart, payments });
+      const saleCart = applied ? { ...priced, discount: { type: 'amount' as const, value: applied.discount, label: applied.label } } : priced;
+      const detail = await createSale({ id: saleId, store, userId: user?.id ?? null, cart: saleCart, payments });
       setCart(EMPTY_CART);
       setSelectedId(null);
       setSaleId(uuidv7());
@@ -229,7 +262,7 @@ export function PosPage() {
           </EmptyState>
         ) : (
           <CartLines
-            lines={cart.lines}
+            lines={priced.lines}
             selectedId={selected?.product_id ?? null}
             onSelect={setSelectedId}
             onChange={(id, delta) => setCart((c) => changeQuantity(c, id, delta))}
@@ -260,6 +293,12 @@ export function PosPage() {
           )}
         </div>
         <div className={`${styles.total} num`}>{formatMoney(totals.total)}</div>
+        {promo && promo.discount > 0 && (
+          <div className={`${styles.summaryRow} ${styles.summaryPromo} num`}>
+            <span>En efectivo ({promo.label.replace('Promo efectivo ', '-')})</span>
+            <span>{formatMoney(totals.total - promo.discount)}</span>
+          </div>
+        )}
         <Button variant="primary" size="lg" block disabled={cart.lines.length === 0} onClick={openPayment}>
           Vender <kbd className={styles.kbdDark}>F12</kbd>
         </Button>
@@ -292,7 +331,7 @@ export function PosPage() {
         />
       )}
       {dialog === 'tickets' && canReturn && <DayTicketsModal onClose={() => setDialog(null)} />}
-      {dialog === 'pay' && <PaymentModal total={totals.total} onClose={() => setDialog(null)} onConfirm={closeSale} />}
+      {dialog === 'pay' && <PaymentModal total={totals.total} promo={promo} canRemovePromo={can('sales.promo_remove')} onClose={() => setDialog(null)} onConfirm={closeSale} />}
       {dialog === 'discount' && canDiscount && <DiscountModal current={cart.discount} onApply={(discount) => setCart((c) => ({ ...c, discount }))} onClose={() => setDialog(null)} />}
       <ScannerModal open={dialog === 'camera'} continuous status={lastScan} onClose={() => setDialog(null)} onDetected={(code) => void addByCode(code, false)} />
     </div>

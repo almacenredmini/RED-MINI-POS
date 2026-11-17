@@ -10,11 +10,22 @@ import { computePayment, type PayMode, type PaymentDraft } from '@/services/paym
 import type { Cents } from '@/types/domain';
 import styles from './Pos.module.css';
 
+/** Promo de efectivo que vale ahora: sólo se aplica si se paga todo en efectivo. */
+export interface PromoOffer {
+  label: string;
+  discount: Cents;
+  /** Aviso cuando hay productos sin promo en la venta (ej. "Sin promo: Cigarrillos"). */
+  note?: string | null;
+}
+
 interface Props {
   total: Cents;
+  promo?: PromoOffer | null;
+  /** Puede quitar la promo en esta venta. */
+  canRemovePromo?: boolean;
   onClose: () => void;
-  /** Debe resolver cuando la venta quedó guardada. */
-  onConfirm: (payments: PaymentDraft[], print: boolean) => Promise<void>;
+  /** Debe resolver cuando la venta quedó guardada. `promo`: la que se aplicó, si se aplicó. */
+  onConfirm: (payments: PaymentDraft[], print: boolean, promo: PromoOffer | null) => Promise<void>;
 }
 
 const MODES: Array<{ mode: PayMode; label: string; key: string }> = [
@@ -25,8 +36,12 @@ const MODES: Array<{ mode: PayMode; label: string; key: string }> = [
   { mode: 'account', label: 'Cuenta', key: 'F8' },
 ];
 
-export function PaymentModal({ total, onClose, onConfirm }: Props) {
+export function PaymentModal({ total: fullTotal, promo = null, canRemovePromo = false, onClose, onConfirm }: Props) {
   const [mode, setMode] = useState<PayMode>('cash');
+  const [promoRemoved, setPromoRemoved] = useState(false);
+  const offered = promo && promo.discount > 0 ? promo : null;
+  const applied = offered && mode === 'cash' && !promoRemoved ? offered : null;
+  const total = fullTotal - (applied?.discount ?? 0);
   const [cashText, setCashText] = useState('');
   const [cardText, setCardText] = useState('');
   const [accountId, setAccountId] = useState('');
@@ -46,7 +61,7 @@ export function PaymentModal({ total, onClose, onConfirm }: Props) {
     submitting.current = true;
     setBusy(true);
     try {
-      await onConfirm(result.payments, print);
+      await onConfirm(result.payments, print, applied);
     } finally {
       submitting.current = false;
       setBusy(false);
@@ -75,7 +90,39 @@ export function PaymentModal({ total, onClose, onConfirm }: Props) {
   return (
     <Modal open title="Cobrar" onClose={onClose}>
       <div className={styles.pay}>
-        <div className={`${styles.payTotal} num`}>{formatMoney(total)}</div>
+        {applied ? (
+          <div className={styles.promo}>
+            <span className={`${styles.promoBefore} num`}>{formatMoney(fullTotal)}</span>
+            <div className={`${styles.payTotal} num`}>{formatMoney(total)}</div>
+            <span className={`${styles.promoText} num`}>
+              {applied.label}: -{formatMoney(applied.discount)}
+            </span>
+            {applied.note && <span className={styles.promoHint}>{applied.note}</span>}
+            {canRemovePromo && (
+              <Button size="sm" variant="ghost" onClick={() => setPromoRemoved(true)}>
+                Quitar promo
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className={`${styles.payTotal} num`}>{formatMoney(total)}</div>
+        )}
+        {offered && !applied && (
+          <p className={styles.promoHint}>
+            {promoRemoved ? (
+              <>
+                Promo quitada en esta venta.{' '}
+                <button type="button" className={styles.linkButton} onClick={() => setPromoRemoved(false)}>
+                  Volver a aplicarla
+                </button>
+              </>
+            ) : (
+              <>
+                Pagando todo en efectivo: {formatMoney(fullTotal - offered.discount)} ({offered.label})
+              </>
+            )}
+          </p>
+        )}
 
         <div className={styles.modes} role="radiogroup" aria-label="Forma de pago">
           {MODES.map((m) => (

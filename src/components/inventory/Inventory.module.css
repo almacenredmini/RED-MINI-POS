@@ -264,3 +264,12 @@ button.row:hover {
   font-size: 0.85rem;
   color: var(--text-faint);
 }
+
+.compareQty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+  font-size: 0.88rem;
+}

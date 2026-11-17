@@ -59,6 +59,7 @@ export async function createSale({ id, store, userId, cart, payments }: NewSale)
       status: 'completed',
       subtotal_cents: totals.subtotal,
       discount_cents: totals.discount,
+      discount_label: totals.discount > 0 ? (cart.discount?.label ?? null) : null,
       total_cents: totals.total,
       occurred_at: now,
       voided_at: null,
@@ -86,7 +87,8 @@ export async function createSale({ id, store, userId, cart, payments }: NewSale)
         quantity: l.quantity,
         unit_price_cents: l.unit_price_cents,
         unit_cost_cents: l.unit_cost_cents,
-        discount_cents: 0,
+        // Promo por cantidad: se cobra el precio promo y el ahorro queda como descuento del ítem.
+        discount_cents: l.list_price_cents ? lineTotal({ quantity: l.quantity, unit_price_cents: l.list_price_cents }) - lineTotal(l) : 0,
         total_cents: lineTotal(l),
       };
       await db.sale_items.add(item);

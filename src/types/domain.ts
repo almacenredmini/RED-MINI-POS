@@ -175,6 +175,58 @@ export interface DayTask extends SyncMeta {
   done_at: ISODate | null;
 }
 
+/**
+ * A quién le toca un pendiente de la planilla en una semana (los cajeros rotan).
+ * Si una semana no tiene fila, vale la de la semana anterior más cercana.
+ */
+export interface TaskAssignment extends SyncMeta {
+  id: UUID;
+  store_id: UUID;
+  /** Lunes de la semana, `AAAA-MM-DD`. */
+  week: string;
+  template_id: UUID;
+  /** null = sin asignar a propósito. */
+  user_id: UUID | null;
+  user_name: string | null;
+}
+
+/**
+ * Promo por pagar en efectivo: un % de descuento según el día y el horario. Lo que paga el cliente
+ * se redondea para abajo (a su favor) para no tener que dar cambio chico.
+ */
+export interface CashPromo extends SyncMeta {
+  id: UUID;
+  store_id: UUID;
+  active: boolean;
+  /** 10 = 10%. */
+  percent: number;
+  /** Días en que vale: 0 = domingo … 6 = sábado. */
+  days: number[];
+  /** `HH:MM`; null = todo el día. Si `to_time` es menor que `from_time`, pasa la medianoche. */
+  from_time: string | null;
+  to_time: string | null;
+  /** Múltiplo al que se redondea lo que paga (10000 = $100); 0 = sin redondeo. */
+  round_cents: number;
+  /** Categorías sin promo (ej. cigarrillos): se cobran a precio lleno. */
+  excluded_category_ids?: UUID[];
+}
+
+/**
+ * Promo por cantidad: el producto vale `unit_price_cents` c/u cuando se llevan entre `min_qty` y
+ * `max_qty` unidades (null = sin tope), en una sucursal, desde `valid_from` hasta `valid_until` inclusive.
+ */
+export interface ProductPromo extends SyncMeta {
+  id: UUID;
+  store_id: UUID;
+  product_id: UUID;
+  unit_price_cents: Cents;
+  min_qty: number;
+  max_qty: number | null;
+  /** `AAAA-MM-DD` */
+  valid_from: string;
+  valid_until: string;
+}
+
 export type ProductChangeAction = 'created' | 'updated' | 'deleted';
 /** De dónde vino el cambio. */
 export type ProductChangeSource = 'manual' | 'import' | 'purchase' | 'bulk_price';
@@ -245,7 +297,7 @@ export interface SyncQueueEntry {
   created_at: ISODate;
 }
 
-export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices' | 'screen_exits' | 'sale_returns' | 'task_templates' | 'day_tasks';
+export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices' | 'screen_exits' | 'sale_returns' | 'task_templates' | 'day_tasks' | 'task_assignments' | 'cash_promos' | 'product_promos';
 
 export type UserRole = 'owner' | 'manager' | 'employee';
 
@@ -391,6 +443,8 @@ export interface Sale {
   status: SaleStatus;
   subtotal_cents: Cents;
   discount_cents: Cents;
+  /** De dónde salió el descuento (ej. "Promo efectivo 10%"); null = manual. */
+  discount_label?: string | null;
   total_cents: Cents;
   occurred_at: ISODate;
   voided_at: ISODate | null;

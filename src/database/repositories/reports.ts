@@ -21,6 +21,8 @@ export interface SalesReport {
   tickets: number;
   cost: number;
   discount: number;
+  /** Parte de `discount` que salió de la promo de efectivo (el resto es descuento manual). */
+  promoDiscount: number;
   voided: { count: number; total: number };
   /** Productos comunes (inventados en el momento): no entran en ningún total del reporte, se informan aparte. */
   common: { count: number; total: number };
@@ -266,6 +268,7 @@ export async function salesReport(storeId: string | null, from: string, to: stri
     cost: [...costBySale.values()].reduce((t, c) => t + c, 0) - returnedCost,
     returns,
     discount: productItems.reduce((t, i) => t + shareOf(i), 0),
+    promoDiscount: productItems.filter((i) => saleById.get(i.sale_id)?.discount_label).reduce((t, i) => t + shareOf(i), 0),
     voided: { count: voided.length, total: voided.reduce((t, s) => t + s.total_cents, 0) },
     common,
     byMethod,

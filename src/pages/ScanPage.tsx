@@ -14,6 +14,7 @@ import { ButtonLink, Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Field';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ProductPromoModal } from '@/components/promos/ProductPromoModal';
 import { formatMoney } from '@/services/money';
 import { parseQuantity } from '@/services/quantity';
 import type { Product } from '@/types/domain';
@@ -31,6 +32,7 @@ export function ScanPage() {
   const [quantity, setQuantity] = useState('');
   // Paso intermedio: quien carga en varias sucursales confirma en cuál va a sumar antes de guardar.
   const [confirming, setConfirming] = useState(false);
+  const [promoFor, setPromoFor] = useState<Product | null>(null);
   const store = useCurrentStore();
   const { user, can } = useAuth();
   const toast = useToast();
@@ -135,9 +137,14 @@ export function ScanPage() {
             <div className={styles.actions}>
               <Button onClick={() => setResult(null)}>Escanear otro</Button>
               {result.product ? (
-                <ButtonLink to={`/productos/${result.product.id}`}>
-                  Ver / editar
-                </ButtonLink>
+                <>
+                  {can('products.edit_price') && (
+                    <Button variant="primary" icon="cash" onClick={() => setPromoFor(result.product)}>
+                      Crear promoción
+                    </Button>
+                  )}
+                  <ButtonLink to={`/productos/${result.product.id}`}>Ver / editar</ButtonLink>
+                </>
               ) : (
                 <ButtonLink to={`/productos/nuevo?codigo=${encodeURIComponent(result.code)}`} variant="primary" icon="plus">
                   Crear producto
@@ -147,6 +154,7 @@ export function ScanPage() {
           </Card>
         )}
       </div>
+      {promoFor && <ProductPromoModal product={promoFor} onClose={() => setPromoFor(null)} />}
     </>
   );
 }

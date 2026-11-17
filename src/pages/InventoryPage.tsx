@@ -10,6 +10,7 @@ import { getStockMap } from '@/database/repositories/stores';
 import { useDebounce } from '@/hooks/useDebounce';
 import { BulkPriceModal } from '@/components/inventory/BulkPriceModal';
 import { ImportModal } from '@/components/inventory/ImportModal';
+import { CompareModal } from '@/components/inventory/CompareModal';
 import { ProductChangesTab } from '@/components/inventory/ProductChanges';
 import { MovementModal, type MovementMode } from '@/components/inventory/MovementModal';
 import { Badge } from '@/components/ui/Badge';
@@ -120,6 +121,7 @@ export function InventoryPage() {
   const [filter, setFilter] = useState<Product | null>(null);
   const [mode, setMode] = useState<MovementMode | null>(null);
   const [importing, setImporting] = useState(false);
+  const [comparing, setComparing] = useState(false);
 
   return (
     <>
@@ -133,6 +135,7 @@ export function InventoryPage() {
             <Button icon="check" onClick={() => setMode('count')}>Conteo</Button>
             {can('stock.transfer') && stores.length > 1 && <Button icon="store" onClick={() => setMode('transfer')}>Transferir</Button>}
             {can('products.edit_price') && <Button icon="cash" onClick={() => setPricing(true)}>Modificar precios</Button>}
+            <Button icon="reports" onClick={() => setComparing(true)}>Comparar Excel</Button>
             <Button variant="primary" icon="purchases" onClick={() => setImporting(true)}>Importar Excel</Button>
           </>
         }
@@ -162,6 +165,7 @@ export function InventoryPage() {
       )}
       {mode && <MovementModal key={mode} mode={mode} onClose={() => setMode(null)} />}
       {importing && <ImportModal onClose={() => setImporting(false)} />}
+      {comparing && <CompareModal onClose={() => setComparing(false)} />}
       {pricing && <BulkPriceModal onClose={() => setPricing(false)} />}
     </>
   );

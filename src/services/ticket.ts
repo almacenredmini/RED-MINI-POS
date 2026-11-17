@@ -36,7 +36,7 @@ export function renderTicketHtml(
   const rows = items
     .map(
       (i) => `<div class="item">${esc(i.description)}</div>
-<div class="row"><span>${qty(i.quantity)} x ${formatMoney(i.unit_price_cents)}</span><span>${formatMoney(i.total_cents)}</span></div>`,
+<div class="row"><span>${qty(i.quantity)} x ${formatMoney(i.unit_price_cents)}${i.discount_cents > 0 ? ' PROMO' : ''}</span><span>${formatMoney(i.total_cents)}</span></div>`,
     )
     .join('');
   const change = payments.reduce((sum, p) => sum + (p.tendered_cents ?? p.amount_cents) - p.amount_cents, 0);
@@ -46,7 +46,7 @@ export function renderTicketHtml(
   const discount =
     sale.discount_cents > 0
       ? `<div class="row"><span>Subtotal</span><span>${formatMoney(sale.subtotal_cents)}</span></div>
-<div class="row"><span>Descuento</span><span>-${formatMoney(sale.discount_cents)}</span></div>`
+<div class="row"><span>${esc(sale.discount_label ?? 'Descuento')}</span><span>-${formatMoney(sale.discount_cents)}</span></div>`
       : '';
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(sale.number)}</title><style>

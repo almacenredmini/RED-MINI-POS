@@ -255,7 +255,12 @@ function Report({ report, start, days, showCost, allStores }: { report: SalesRep
         />
         <StatCard label="Tickets" value={report.tickets} icon="reports" foot={`Promedio ${formatMoney(report.tickets ? Math.round(report.total / report.tickets) : 0)}`} />
         {showCost && <StatCard label="Ganancia bruta" value={formatMoney(profit)} icon="cash" foot={`Margen ${pct(profit, report.total)}`} />}
-        <StatCard label="Descuentos" value={formatMoney(report.discount)} icon="minus" foot="Ya restados de las ventas" />
+        <StatCard
+          label="Descuentos"
+          value={formatMoney(report.discount)}
+          icon="minus"
+          foot={report.promoDiscount > 0 ? `Promo efectivo ${formatMoney(report.promoDiscount)} · manuales ${formatMoney(report.discount - report.promoDiscount)}` : 'Ya restados de las ventas'}
+        />
       </div>
 
       <div className={styles.grid}>

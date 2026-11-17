@@ -1,3 +1,5 @@
+import { listPromos, savePromo } from '@/database/repositories/cashPromos';
+import { listProductPromos, saveProductPromo } from '@/database/repositories/productPromos';
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -500,5 +502,32 @@ describe('otras operaciones', () => {
     await sync();
     const res = await pg.query<{ status: string }>('select status from purchases where id = $1', [draft.id]);
     expect(res.rows[0]?.status).toBe('cancelled');
+  });
+
+  it('la promo de efectivo y la venta con promo llegan a los demás dispositivos', async () => {
+    await savePromo(ORO.id, { active: true, percent: 10, days: [1, 2, 3], from_time: '14:00', to_time: '18:00', round_cents: 10000, excluded_category_ids: ['01930000-0000-7000-8000-0000000000c1'] });
+    const p = await saveProduct(base);
+    const cart = { ...addLine(EMPTY_CART, { product_id: p.id, name: 'Fernet', barcode: '111', unit: 'unit', unit_price_cents: 2000, unit_cost_cents: 1000 }), discount: { type: 'amount' as const, value: 200, label: 'Promo efectivo 10%' } };
+    const { sale } = await createSale({ id: uuidv7(), store: ORO, userId: null, cart, payments: computePayment('cash', 1800, null).payments });
+    await sync();
+    expect(await queueByStatus('pending')).toBe(0);
+    const res = await pg.query<{ discount_label: string }>('select discount_label from sales where id = $1', [sale.id]);
+    expect(res.rows[0]?.discount_label).toBe('Promo efectivo 10%');
+
+    await newDevice();
+    await sync(ORO.id);
+    expect(await listPromos(ORO.id)).toMatchObject([{ percent: 10, days: [1, 2, 3], from_time: '14:00', round_cents: 10000, excluded_category_ids: ['01930000-0000-7000-8000-0000000000c1'] }]);
+    expect(await db.sales.get(sale.id)).toMatchObject({ discount_cents: 200, discount_label: 'Promo efectivo 10%', total_cents: 1800 });
+  });
+
+  it('una promo por cantidad llega a las cajas de esa sucursal', async () => {
+    const p = await saveProduct(base);
+    await saveProductPromo(ORO.id, p.id, { unit_price_cents: 1800, min_qty: 3, max_qty: 6.5, valid_from: '2026-11-17', valid_until: '2099-12-31' });
+    await sync();
+    expect(await queueByStatus('pending')).toBe(0);
+
+    await newDevice();
+    await sync(ORO.id);
+    expect(await listProductPromos(ORO.id, p.id, '2026-11-17')).toMatchObject([{ unit_price_cents: 1800, min_qty: 3, max_qty: 6.5, valid_until: '2099-12-31' }]);
   });
 });

@@ -3,20 +3,31 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentStore } from '@/contexts/DeviceContext';
 import { useToast } from '@/contexts/ToastContext';
-import { addDayTask, addTemplate, dayKey, listDayTasks, listTemplates, moveTemplate, removeDayTask, removeTemplate, renameTemplate, setTaskDone, type TaskView } from '@/database/repositories/tasks';
+import { addDayTask, addTemplate, assignTask, dayKey, listDayTasks, listTemplates, moveTemplate, removeDayTask, removeTemplate, renameTemplate, setTaskDone, shiftWeek, weekAssignments, weekKey, type TaskView } from '@/database/repositories/tasks';
+import { listUsers } from '@/database/repositories/users';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Field';
+import { Input, Select } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { Modal } from '@/components/ui/Modal';
 import styles from './Tasks.module.css';
 
 const hour = (iso: string) => new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 
-/** Cuántos pendientes quedan hoy en la sucursal: para el botón de la pantalla de venta. */
+/** Es de esta persona o no tiene a nadie asignado. */
+const forMe = (t: TaskView, userId: string | undefined) => !t.assignedTo || t.assignedTo === userId;
+
+/**
+ * Cuántos pendientes quedan hoy, para el botón del encabezado. El encargado ve todos;
+ * cada cajero, los suyos y los que no tienen a nadie asignado.
+ */
 export function usePendingCount(storeId: string): number {
-  return useLiveQuery(async () => (await listDayTasks(storeId, dayKey())).filter((t) => !t.doneAt).length, [storeId], 0);
+  const { user, can } = useAuth();
+  const all = can('tasks.manage');
+  return useLiveQuery(async () => (await listDayTasks(storeId, dayKey())).filter((t) => !t.doneAt && (all || forMe(t, user?.id))).length, [storeId, user?.id, all], 0);
 }
+
+const shortDate = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric' });
 
 /** Botón del encabezado: se ve en todas las pantallas, con cuántos pendientes quedan. */
 export function DayTasksButton() {
@@ -52,7 +63,7 @@ export function DayTasksModal({ onClose }: { onClose: () => void }) {
   const toast = useToast();
   const manager = can('tasks.manage');
   const [day, setDay] = useState(() => dayKey());
-  const [editing, setEditing] = useState(false);
+  const [mode, setMode] = useState<'tasks' | 'template' | 'assign'>('tasks');
   const [text, setText] = useState('');
   const tasks = useLiveQuery(() => listDayTasks(store.id, day), [store.id, day]);
   const isToday = day === dayKey();
@@ -82,19 +93,19 @@ export function DayTasksModal({ onClose }: { onClose: () => void }) {
   const done = tasks?.filter((t) => t.doneAt).length ?? 0;
 
   // Una sola ventana: cambiar de <dialog> al editar la planilla la cerraba.
-  if (editing) {
+  if (mode !== 'tasks') {
     return (
       <Modal
         open
-        title={`Planilla de ${store.name}`}
+        title={mode === 'template' ? `Planilla de ${store.name}` : 'A quién le toca'}
         onClose={onClose}
         footer={
-          <Button icon="back" onClick={() => setEditing(false)}>
+          <Button icon="back" onClick={() => setMode('tasks')}>
             Volver a los pendientes
           </Button>
         }
       >
-        <TemplateEditor storeId={store.id} />
+        {mode === 'template' ? <TemplateEditor storeId={store.id} /> : <AssignEditor storeId={store.id} initialWeek={weekKey(day)} />}
       </Modal>
     );
   }
@@ -108,9 +119,14 @@ export function DayTasksModal({ onClose }: { onClose: () => void }) {
         manager && (
           <div className={styles.footer}>
             <Input type="date" value={day} max={dayKey()} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Día" />
-            <Button icon="settings" onClick={() => setEditing(true)}>
-              Editar planilla
-            </Button>
+            <div className={styles.footerButtons}>
+              <Button icon="calendar" onClick={() => setMode('assign')}>
+                Asignar
+              </Button>
+              <Button icon="settings" onClick={() => setMode('template')}>
+                Planilla
+              </Button>
+            </div>
           </div>
         )
       }
@@ -126,7 +142,7 @@ export function DayTasksModal({ onClose }: { onClose: () => void }) {
           </p>
           <ul className={styles.list}>
             {tasks.map((t) => (
-              <li key={t.key} className={t.doneAt ? styles.done : undefined}>
+              <li key={t.key} className={t.doneAt ? styles.done : t.assignedTo && t.assignedTo === user?.id ? styles.mineRow : undefined}>
                 <button type="button" className={styles.task} onClick={() => toggle(t)} aria-pressed={!!t.doneAt}>
                   <span className={styles.box}>{t.doneAt && <Icon name="check" size={16} />}</span>
                   <span className={styles.text}>
@@ -134,9 +150,14 @@ export function DayTasksModal({ onClose }: { onClose: () => void }) {
                     {t.doneAt ? (
                       <span className={styles.who}>
                         {t.doneByName ?? 'Sin usuario'} · {hour(t.doneAt)}
+                        {t.assignedTo && t.assignedTo !== t.doneBy && <span className="muted"> (le tocaba a {t.assignedName})</span>}
                       </span>
+                    ) : t.extra ? (
+                      <span className="muted">Sólo para este día</span>
+                    ) : t.assignedTo === user?.id ? (
+                      <span className={styles.mine}>Te toca a vos</span>
                     ) : (
-                      t.extra && <span className="muted">Sólo para este día</span>
+                      t.assignedTo && <span className="muted">Le toca a {t.assignedName}</span>
                     )}
                   </span>
                 </button>
@@ -163,6 +184,64 @@ export function DayTasksModal({ onClose }: { onClose: () => void }) {
         </form>
       )}
     </Modal>
+  );
+}
+
+/**
+ * A quién le toca cada pendiente, semana a semana. Cada lunes rota solo; lo que se cambia acá
+ * vale para esa semana y desde ahí sigue rotando.
+ */
+function AssignEditor({ storeId, initialWeek }: { storeId: string; initialWeek: string }) {
+  const toast = useToast();
+  const [week, setWeek] = useState(initialWeek);
+  const data = useLiveQuery(async () => {
+    const [templates, who, users] = await Promise.all([listTemplates(storeId), weekAssignments(storeId, week), listUsers()]);
+    const people = users.filter((u) => u.active && !u.deleted_at && (!u.store_id || u.store_id === storeId)).sort((a, b) => a.name.localeCompare(b.name));
+    return { templates, who, people };
+  }, [storeId, week]);
+  const next = shiftWeek(week, 1);
+  const sunday = new Date(`${next}T12:00:00`);
+  sunday.setDate(sunday.getDate() - 1);
+
+  const change = (templateId: string, userId: string) => {
+    const person = data?.people.find((p) => p.id === userId);
+    assignTask(storeId, week, templateId, { userId: person?.id ?? null, name: person?.name ?? null }).catch((e: unknown) =>
+      toast(e instanceof Error ? e.message : 'No se pudo guardar', 'error'),
+    );
+  };
+
+  return (
+    <>
+      <div className={styles.weekNav}>
+        <Button size="sm" variant="ghost" icon="back" aria-label="Semana anterior" onClick={() => setWeek(shiftWeek(week, -1))} />
+        <strong>
+          Semana del {shortDate(week)} al {shortDate(dayKey(sunday))}
+        </strong>
+        <Button size="sm" variant="ghost" icon="back" className={styles.flip} aria-label="Semana siguiente" onClick={() => setWeek(next)} />
+      </div>
+      <p className="muted">Cada lunes rota solo: cada uno pasa a lo que hacía el siguiente. Si cambiás algo, vale desde esta semana y sigue rotando desde ahí.</p>
+      {data && data.templates.length === 0 ? (
+        <EmptyState icon="check" title="La planilla está vacía">
+          <p>Primero cargá los pendientes de todos los días en "Planilla".</p>
+        </EmptyState>
+      ) : (
+        <ul className={styles.list}>
+          {data?.templates.map((t) => (
+            <li key={t.id} className={styles.assignRow}>
+              <span className={styles.title}>{t.title}</span>
+              <Select value={data.who.get(t.id)?.userId ?? ''} onChange={(e) => change(t.id, e.target.value)} aria-label={`Quién hace ${t.title}`}>
+                <option value="">Cualquiera</option>
+                {data.people.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 

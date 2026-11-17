@@ -106,3 +106,60 @@
   font-size: 0.75rem;
   font-weight: 700;
 }
+
+.footerButtons {
+  display: flex;
+  gap: 8px;
+}
+
+.mine {
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.mineRow .task {
+  border-color: var(--accent);
+}
+
+.weekNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.flip svg {
+  transform: rotate(180deg);
+}
+
+.assignRow {
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.assignRow > :last-child {
+  flex: 0 0 46%;
+  min-width: 0;
+}
+
+/* Al pie: fecha y botones se reparten el ancho; en el celular los botones bajan a otra fila. */
+.footer {
+  flex-wrap: wrap;
+}
+
+.footer > :first-child {
+  flex: 1 1 150px;
+}
+
+.footerButtons {
+  flex: 1 1 220px;
+}
+
+.footerButtons > * {
+  flex: 1;
+}

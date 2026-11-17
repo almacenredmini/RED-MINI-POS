@@ -21,7 +21,13 @@ export function CartLines({ lines, selectedId, onSelect, onChange, onRemove }: P
         <li key={l.product_id} className={`${styles.line} ${l.product_id === selectedId ? styles.lineActive : ''}`} onClick={() => onSelect(l.product_id)}>
           <div className={styles.lineName}>
             <strong>{l.name}</strong>
-            <span className="muted num">{formatMoney(l.unit_price_cents)} c/u</span>
+            {l.list_price_cents ? (
+              <span className="num">
+                <s className="muted">{formatMoney(l.list_price_cents)}</s> <span className={styles.linePromo}>{formatMoney(l.unit_price_cents)} c/u · {l.promo_text}</span>
+              </span>
+            ) : (
+              <span className="muted num">{formatMoney(l.unit_price_cents)} c/u</span>
+            )}
           </div>
           <div className={styles.qty}>
             <Button size="sm" icon="minus" aria-label={`Restar ${l.name}`} onMouseDown={keepFocus} onClick={() => onChange(l.product_id, -1)} />

@@ -1855,3 +1855,458 @@ begin
   );
 end $$;
 
+
+-- ===== 0020_task_assignments.sql =====
+-- RED MINI POS · 0020 · A quién le toca cada pendiente.
+-- task_assignments: el cajero de cada pendiente de la planilla, semana a semana (rotativo).
+-- Una semana sin asignaciones sigue igual que la anterior.
+-- Es compatible con la versión anterior de la app: correr ANTES de actualizar los dispositivos.
+
+create table if not exists task_assignments (
+  id                uuid primary key,
+  store_id          uuid not null,
+  week              date not null,
+  template_id       uuid not null,
+  user_id           uuid,
+  user_name         text,
+  created_at        timestamptz not null,
+  updated_at        timestamptz not null,
+  deleted_at        timestamptz,
+  version           integer not null default 1,
+  updated_by_device uuid not null,
+  server_seq        bigint not null,
+  server_updated_at timestamptz not null default now()
+);
+create index if not exists task_assignments_store_idx on task_assignments (store_id, week);
+create index if not exists task_assignments_server_seq_idx on task_assignments (server_seq);
+drop trigger if exists task_assignments_sync on task_assignments;
+create trigger task_assignments_sync before insert or update on task_assignments for each row execute function tg_sync_stamp();
+alter table task_assignments enable row level security;
+revoke all on table task_assignments from anon, authenticated;
+
+create or replace function sync_apply_op(p_table text, p_op text, p_id uuid, p jsonb) returns sync_result
+language plpgsql security definer set search_path = public as $$
+declare
+  cols text;
+  n integer;
+  cur_version integer;
+  cur_updated timestamptz;
+begin
+  if p_op = 'delete' then
+    if p_table <> 'purchase_items' then
+      raise exception 'No se permite borrar filas de %', p_table;
+    end if;
+    delete from purchase_items where id = p_id;
+    insert into sync_deletes (table_name, record_id, server_seq) values (p_table, p_id, nextval('sync_seq'))
+      on conflict (table_name, record_id) do update set server_seq = excluded.server_seq;
+    return 'applied';
+  end if;
+
+  -- Sólo las columnas que trae el cambio: las demás usan su valor por defecto.
+  select string_agg(quote_ident(c.column_name), ', ') into cols
+  from information_schema.columns c
+  where c.table_schema = 'public' and c.table_name = p_table and c.is_generated = 'NEVER'
+    and c.column_name not in ('server_seq', 'server_updated_at') and p ? c.column_name;
+
+  if p_table in ('stock_movements', 'sale_items', 'payments', 'product_cost_history', 'account_movements', 'purchase_items', 'cash_movements', 'product_changes', 'screen_exits', 'sale_returns') then
+    -- Sin conflictos posibles: id único y filas inmutables. Reenviar no duplica.
+    execute format('insert into %I (%s) select %s from jsonb_populate_record(null::%I, $1) on conflict (id) do nothing', p_table, cols, cols, p_table) using p;
+    get diagnostics n = row_count;
+    return case when n > 0 then 'applied' else 'duplicate' end::sync_result;
+  end if;
+
+  if p_table not in ('stores', 'users', 'categories', 'products', 'barcodes', 'suppliers', 'purchases', 'employee_accounts', 'sales', 'cash_sessions', 'staff_schedules', 'supplier_invoices', 'task_templates', 'day_tasks', 'task_assignments') then
+    raise exception 'Tabla no sincronizable: %', p_table;
+  end if;
+
+  execute format('select version, updated_at from %I where id = $1', p_table) into cur_version, cur_updated using p_id;
+  if cur_version is null then
+    execute format('insert into %I (%s) select %s from jsonb_populate_record(null::%I, $1)', p_table, cols, cols, p_table) using p;
+    return 'applied';
+  end if;
+
+  -- Gana la versión más alta y, si empatan, el cambio más reciente.
+  if (p ->> 'version')::integer > cur_version
+     or ((p ->> 'version')::integer = cur_version and (p ->> 'updated_at')::timestamptz > cur_updated) then
+    execute format('update %I set (%s) = (select %s from jsonb_populate_record(null::%I, $1)) where id = $2', p_table, cols, cols, p_table) using p, p_id;
+    return 'applied';
+  end if;
+  return 'conflict_resolved';
+end $$;
+
+-- p_store: null = todo; con valor = el catálogo compartido y sólo lo de esa sucursal.
+create or replace function sync_pull(p_cursor bigint, p_store uuid default null, p_limit integer default 500) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  rows jsonb;
+  total integer;
+begin
+  perform sync_assert_member();
+
+  with changes as (
+    select 'stores' as t, server_seq as seq, to_jsonb(x) as r from stores x where server_seq > p_cursor
+    union all select 'users', server_seq, to_jsonb(x) from users x where server_seq > p_cursor
+    union all select 'categories', server_seq, to_jsonb(x) from categories x where server_seq > p_cursor
+    union all select 'products', server_seq, to_jsonb(x) from products x where server_seq > p_cursor
+    union all select 'barcodes', server_seq, to_jsonb(x) from barcodes x where server_seq > p_cursor
+    union all select 'suppliers', server_seq, to_jsonb(x) from suppliers x where server_seq > p_cursor
+    union all select 'employee_accounts', server_seq, to_jsonb(x) from employee_accounts x where server_seq > p_cursor
+    union all select 'account_movements', server_seq, to_jsonb(x) from account_movements x where server_seq > p_cursor
+    union all select 'product_cost_history', server_seq, to_jsonb(x) from product_cost_history x where server_seq > p_cursor
+    union all select 'stock_movements', server_seq, to_jsonb(x) from stock_movements x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'sales', server_seq, to_jsonb(x) from sales x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'sale_items', x.server_seq, to_jsonb(x) from sale_items x join sales s on s.id = x.sale_id
+      where x.server_seq > p_cursor and (p_store is null or s.store_id = p_store)
+    union all select 'payments', x.server_seq, to_jsonb(x) from payments x join sales s on s.id = x.sale_id
+      where x.server_seq > p_cursor and (p_store is null or s.store_id = p_store)
+    union all select 'purchases', server_seq, to_jsonb(x) from purchases x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'purchase_items', x.server_seq, to_jsonb(x) from purchase_items x join purchases p on p.id = x.purchase_id
+      where x.server_seq > p_cursor and (p_store is null or p.store_id = p_store)
+    union all select 'cash_sessions', server_seq, to_jsonb(x) from cash_sessions x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'cash_movements', x.server_seq, to_jsonb(x) from cash_movements x join cash_sessions c on c.id = x.cash_session_id
+      where x.server_seq > p_cursor and (p_store is null or c.store_id = p_store)
+    union all select 'product_changes', server_seq, to_jsonb(x) from product_changes x where server_seq > p_cursor
+    union all select 'staff_schedules', server_seq, to_jsonb(x) from staff_schedules x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'supplier_invoices', server_seq, to_jsonb(x) from supplier_invoices x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'screen_exits', server_seq, to_jsonb(x) from screen_exits x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'sale_returns', server_seq, to_jsonb(x) from sale_returns x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'task_templates', server_seq, to_jsonb(x) from task_templates x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'day_tasks', server_seq, to_jsonb(x) from day_tasks x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'task_assignments', server_seq, to_jsonb(x) from task_assignments x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'deleted:' || table_name, server_seq, jsonb_build_object('id', record_id) from sync_deletes where server_seq > p_cursor
+  ), page as (
+    select * from changes order by seq limit p_limit + 1
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('table', t, 'seq', seq, 'row', r - 'server_seq' - 'server_updated_at') order by seq), '[]'), count(*)
+  into rows, total from page;
+
+  if total > p_limit then
+    rows := rows - p_limit;
+  end if;
+
+  return jsonb_build_object(
+    'changes', rows,
+    'next_cursor', coalesce((rows -> -1 ->> 'seq')::bigint, p_cursor),
+    'has_more', total > p_limit
+  );
+end $$;
+
+
+-- ===== 0021_cash_promos.sql =====
+-- RED MINI POS · 0021 · Promo por pagar en efectivo.
+-- cash_promos: % de descuento por sucursal, según día y horario, con redondeo a favor del cliente.
+--   excluded_category_ids: categorías sin promo (ej. cigarrillos).
+-- sales.discount_label: de dónde salió el descuento de la venta (null = descuento manual).
+-- Es compatible con la versión anterior de la app: correr ANTES de actualizar los dispositivos.
+
+create table if not exists cash_promos (
+  id                uuid primary key,
+  store_id          uuid not null,
+  active            boolean not null default true,
+  percent           numeric(5,2) not null,
+  days              smallint[] not null,
+  from_time         text,
+  to_time           text,
+  round_cents       integer not null default 0,
+  excluded_category_ids uuid[] not null default '{}',
+  created_at        timestamptz not null,
+  updated_at        timestamptz not null,
+  deleted_at        timestamptz,
+  version           integer not null default 1,
+  updated_by_device uuid not null,
+  server_seq        bigint not null,
+  server_updated_at timestamptz not null default now()
+);
+create index if not exists cash_promos_store_idx on cash_promos (store_id);
+create index if not exists cash_promos_server_seq_idx on cash_promos (server_seq);
+drop trigger if exists cash_promos_sync on cash_promos;
+create trigger cash_promos_sync before insert or update on cash_promos for each row execute function tg_sync_stamp();
+alter table cash_promos enable row level security;
+revoke all on table cash_promos from anon, authenticated;
+
+alter table sales add column if not exists discount_label text;
+
+create or replace function sync_apply_op(p_table text, p_op text, p_id uuid, p jsonb) returns sync_result
+language plpgsql security definer set search_path = public as $$
+declare
+  cols text;
+  n integer;
+  cur_version integer;
+  cur_updated timestamptz;
+begin
+  if p_op = 'delete' then
+    if p_table <> 'purchase_items' then
+      raise exception 'No se permite borrar filas de %', p_table;
+    end if;
+    delete from purchase_items where id = p_id;
+    insert into sync_deletes (table_name, record_id, server_seq) values (p_table, p_id, nextval('sync_seq'))
+      on conflict (table_name, record_id) do update set server_seq = excluded.server_seq;
+    return 'applied';
+  end if;
+
+  -- Sólo las columnas que trae el cambio: las demás usan su valor por defecto.
+  select string_agg(quote_ident(c.column_name), ', ') into cols
+  from information_schema.columns c
+  where c.table_schema = 'public' and c.table_name = p_table and c.is_generated = 'NEVER'
+    and c.column_name not in ('server_seq', 'server_updated_at') and p ? c.column_name;
+
+  if p_table in ('stock_movements', 'sale_items', 'payments', 'product_cost_history', 'account_movements', 'purchase_items', 'cash_movements', 'product_changes', 'screen_exits', 'sale_returns') then
+    -- Sin conflictos posibles: id único y filas inmutables. Reenviar no duplica.
+    execute format('insert into %I (%s) select %s from jsonb_populate_record(null::%I, $1) on conflict (id) do nothing', p_table, cols, cols, p_table) using p;
+    get diagnostics n = row_count;
+    return case when n > 0 then 'applied' else 'duplicate' end::sync_result;
+  end if;
+
+  if p_table not in ('stores', 'users', 'categories', 'products', 'barcodes', 'suppliers', 'purchases', 'employee_accounts', 'sales', 'cash_sessions', 'staff_schedules', 'supplier_invoices', 'task_templates', 'day_tasks', 'task_assignments', 'cash_promos') then
+    raise exception 'Tabla no sincronizable: %', p_table;
+  end if;
+
+  execute format('select version, updated_at from %I where id = $1', p_table) into cur_version, cur_updated using p_id;
+  if cur_version is null then
+    execute format('insert into %I (%s) select %s from jsonb_populate_record(null::%I, $1)', p_table, cols, cols, p_table) using p;
+    return 'applied';
+  end if;
+
+  -- Gana la versión más alta y, si empatan, el cambio más reciente.
+  if (p ->> 'version')::integer > cur_version
+     or ((p ->> 'version')::integer = cur_version and (p ->> 'updated_at')::timestamptz > cur_updated) then
+    execute format('update %I set (%s) = (select %s from jsonb_populate_record(null::%I, $1)) where id = $2', p_table, cols, cols, p_table) using p, p_id;
+    return 'applied';
+  end if;
+  return 'conflict_resolved';
+end $$;
+
+-- p_store: null = todo; con valor = el catálogo compartido y sólo lo de esa sucursal.
+create or replace function sync_pull(p_cursor bigint, p_store uuid default null, p_limit integer default 500) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  rows jsonb;
+  total integer;
+begin
+  perform sync_assert_member();
+
+  with changes as (
+    select 'stores' as t, server_seq as seq, to_jsonb(x) as r from stores x where server_seq > p_cursor
+    union all select 'users', server_seq, to_jsonb(x) from users x where server_seq > p_cursor
+    union all select 'categories', server_seq, to_jsonb(x) from categories x where server_seq > p_cursor
+    union all select 'products', server_seq, to_jsonb(x) from products x where server_seq > p_cursor
+    union all select 'barcodes', server_seq, to_jsonb(x) from barcodes x where server_seq > p_cursor
+    union all select 'suppliers', server_seq, to_jsonb(x) from suppliers x where server_seq > p_cursor
+    union all select 'employee_accounts', server_seq, to_jsonb(x) from employee_accounts x where server_seq > p_cursor
+    union all select 'account_movements', server_seq, to_jsonb(x) from account_movements x where server_seq > p_cursor
+    union all select 'product_cost_history', server_seq, to_jsonb(x) from product_cost_history x where server_seq > p_cursor
+    union all select 'stock_movements', server_seq, to_jsonb(x) from stock_movements x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'sales', server_seq, to_jsonb(x) from sales x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'sale_items', x.server_seq, to_jsonb(x) from sale_items x join sales s on s.id = x.sale_id
+      where x.server_seq > p_cursor and (p_store is null or s.store_id = p_store)
+    union all select 'payments', x.server_seq, to_jsonb(x) from payments x join sales s on s.id = x.sale_id
+      where x.server_seq > p_cursor and (p_store is null or s.store_id = p_store)
+    union all select 'purchases', server_seq, to_jsonb(x) from purchases x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'purchase_items', x.server_seq, to_jsonb(x) from purchase_items x join purchases p on p.id = x.purchase_id
+      where x.server_seq > p_cursor and (p_store is null or p.store_id = p_store)
+    union all select 'cash_sessions', server_seq, to_jsonb(x) from cash_sessions x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'cash_movements', x.server_seq, to_jsonb(x) from cash_movements x join cash_sessions c on c.id = x.cash_session_id
+      where x.server_seq > p_cursor and (p_store is null or c.store_id = p_store)
+    union all select 'product_changes', server_seq, to_jsonb(x) from product_changes x where server_seq > p_cursor
+    union all select 'staff_schedules', server_seq, to_jsonb(x) from staff_schedules x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'supplier_invoices', server_seq, to_jsonb(x) from supplier_invoices x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'screen_exits', server_seq, to_jsonb(x) from screen_exits x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'sale_returns', server_seq, to_jsonb(x) from sale_returns x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'task_templates', server_seq, to_jsonb(x) from task_templates x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'day_tasks', server_seq, to_jsonb(x) from day_tasks x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'task_assignments', server_seq, to_jsonb(x) from task_assignments x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'cash_promos', server_seq, to_jsonb(x) from cash_promos x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'deleted:' || table_name, server_seq, jsonb_build_object('id', record_id) from sync_deletes where server_seq > p_cursor
+  ), page as (
+    select * from changes order by seq limit p_limit + 1
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('table', t, 'seq', seq, 'row', r - 'server_seq' - 'server_updated_at') order by seq), '[]'), count(*)
+  into rows, total from page;
+
+  if total > p_limit then
+    rows := rows - p_limit;
+  end if;
+
+  return jsonb_build_object(
+    'changes', rows,
+    'next_cursor', coalesce((rows -> -1 ->> 'seq')::bigint, p_cursor),
+    'has_more', total > p_limit
+  );
+end $$;
+
+
+-- ===== 0022_product_promos.sql =====
+-- RED MINI POS · 0022 · Promos por cantidad de un producto.
+-- product_promos: precio unitario especial de un producto cuando se lleva entre min_qty y max_qty
+-- unidades, por sucursal, hasta valid_until inclusive.
+-- Es compatible con la versión anterior de la app: correr ANTES de actualizar los dispositivos.
+
+create table if not exists product_promos (
+  id                uuid primary key,
+  store_id          uuid not null,
+  product_id        uuid not null,
+  unit_price_cents  bigint not null,
+  min_qty           numeric(12,3) not null,
+  max_qty           numeric(12,3),
+  valid_from        date not null,
+  valid_until       date not null,
+  created_at        timestamptz not null,
+  updated_at        timestamptz not null,
+  deleted_at        timestamptz,
+  version           integer not null default 1,
+  updated_by_device uuid not null,
+  server_seq        bigint not null,
+  server_updated_at timestamptz not null default now()
+);
+create index if not exists product_promos_store_idx on product_promos (store_id, product_id);
+create index if not exists product_promos_server_seq_idx on product_promos (server_seq);
+drop trigger if exists product_promos_sync on product_promos;
+create trigger product_promos_sync before insert or update on product_promos for each row execute function tg_sync_stamp();
+alter table product_promos enable row level security;
+revoke all on table product_promos from anon, authenticated;
+
+create or replace function sync_apply_op(p_table text, p_op text, p_id uuid, p jsonb) returns sync_result
+language plpgsql security definer set search_path = public as $$
+declare
+  cols text;
+  n integer;
+  cur_version integer;
+  cur_updated timestamptz;
+begin
+  if p_op = 'delete' then
+    if p_table <> 'purchase_items' then
+      raise exception 'No se permite borrar filas de %', p_table;
+    end if;
+    delete from purchase_items where id = p_id;
+    insert into sync_deletes (table_name, record_id, server_seq) values (p_table, p_id, nextval('sync_seq'))
+      on conflict (table_name, record_id) do update set server_seq = excluded.server_seq;
+    return 'applied';
+  end if;
+
+  -- Sólo las columnas que trae el cambio: las demás usan su valor por defecto.
+  select string_agg(quote_ident(c.column_name), ', ') into cols
+  from information_schema.columns c
+  where c.table_schema = 'public' and c.table_name = p_table and c.is_generated = 'NEVER'
+    and c.column_name not in ('server_seq', 'server_updated_at') and p ? c.column_name;
+
+  if p_table in ('stock_movements', 'sale_items', 'payments', 'product_cost_history', 'account_movements', 'purchase_items', 'cash_movements', 'product_changes', 'screen_exits', 'sale_returns') then
+    -- Sin conflictos posibles: id único y filas inmutables. Reenviar no duplica.
+    execute format('insert into %I (%s) select %s from jsonb_populate_record(null::%I, $1) on conflict (id) do nothing', p_table, cols, cols, p_table) using p;
+    get diagnostics n = row_count;
+    return case when n > 0 then 'applied' else 'duplicate' end::sync_result;
+  end if;
+
+  if p_table not in ('stores', 'users', 'categories', 'products', 'barcodes', 'suppliers', 'purchases', 'employee_accounts', 'sales', 'cash_sessions', 'staff_schedules', 'supplier_invoices', 'task_templates', 'day_tasks', 'task_assignments', 'cash_promos', 'product_promos') then
+    raise exception 'Tabla no sincronizable: %', p_table;
+  end if;
+
+  execute format('select version, updated_at from %I where id = $1', p_table) into cur_version, cur_updated using p_id;
+  if cur_version is null then
+    execute format('insert into %I (%s) select %s from jsonb_populate_record(null::%I, $1)', p_table, cols, cols, p_table) using p;
+    return 'applied';
+  end if;
+
+  -- Gana la versión más alta y, si empatan, el cambio más reciente.
+  if (p ->> 'version')::integer > cur_version
+     or ((p ->> 'version')::integer = cur_version and (p ->> 'updated_at')::timestamptz > cur_updated) then
+    execute format('update %I set (%s) = (select %s from jsonb_populate_record(null::%I, $1)) where id = $2', p_table, cols, cols, p_table) using p, p_id;
+    return 'applied';
+  end if;
+  return 'conflict_resolved';
+end $$;
+
+-- p_store: null = todo; con valor = el catálogo compartido y sólo lo de esa sucursal.
+create or replace function sync_pull(p_cursor bigint, p_store uuid default null, p_limit integer default 500) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  rows jsonb;
+  total integer;
+begin
+  perform sync_assert_member();
+
+  with changes as (
+    select 'stores' as t, server_seq as seq, to_jsonb(x) as r from stores x where server_seq > p_cursor
+    union all select 'users', server_seq, to_jsonb(x) from users x where server_seq > p_cursor
+    union all select 'categories', server_seq, to_jsonb(x) from categories x where server_seq > p_cursor
+    union all select 'products', server_seq, to_jsonb(x) from products x where server_seq > p_cursor
+    union all select 'barcodes', server_seq, to_jsonb(x) from barcodes x where server_seq > p_cursor
+    union all select 'suppliers', server_seq, to_jsonb(x) from suppliers x where server_seq > p_cursor
+    union all select 'employee_accounts', server_seq, to_jsonb(x) from employee_accounts x where server_seq > p_cursor
+    union all select 'account_movements', server_seq, to_jsonb(x) from account_movements x where server_seq > p_cursor
+    union all select 'product_cost_history', server_seq, to_jsonb(x) from product_cost_history x where server_seq > p_cursor
+    union all select 'stock_movements', server_seq, to_jsonb(x) from stock_movements x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'sales', server_seq, to_jsonb(x) from sales x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'sale_items', x.server_seq, to_jsonb(x) from sale_items x join sales s on s.id = x.sale_id
+      where x.server_seq > p_cursor and (p_store is null or s.store_id = p_store)
+    union all select 'payments', x.server_seq, to_jsonb(x) from payments x join sales s on s.id = x.sale_id
+      where x.server_seq > p_cursor and (p_store is null or s.store_id = p_store)
+    union all select 'purchases', server_seq, to_jsonb(x) from purchases x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'purchase_items', x.server_seq, to_jsonb(x) from purchase_items x join purchases p on p.id = x.purchase_id
+      where x.server_seq > p_cursor and (p_store is null or p.store_id = p_store)
+    union all select 'cash_sessions', server_seq, to_jsonb(x) from cash_sessions x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'cash_movements', x.server_seq, to_jsonb(x) from cash_movements x join cash_sessions c on c.id = x.cash_session_id
+      where x.server_seq > p_cursor and (p_store is null or c.store_id = p_store)
+    union all select 'product_changes', server_seq, to_jsonb(x) from product_changes x where server_seq > p_cursor
+    union all select 'staff_schedules', server_seq, to_jsonb(x) from staff_schedules x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'supplier_invoices', server_seq, to_jsonb(x) from supplier_invoices x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'screen_exits', server_seq, to_jsonb(x) from screen_exits x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'sale_returns', server_seq, to_jsonb(x) from sale_returns x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'task_templates', server_seq, to_jsonb(x) from task_templates x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'day_tasks', server_seq, to_jsonb(x) from day_tasks x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'task_assignments', server_seq, to_jsonb(x) from task_assignments x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'cash_promos', server_seq, to_jsonb(x) from cash_promos x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'product_promos', server_seq, to_jsonb(x) from product_promos x
+      where server_seq > p_cursor and (p_store is null or store_id = p_store)
+    union all select 'deleted:' || table_name, server_seq, jsonb_build_object('id', record_id) from sync_deletes where server_seq > p_cursor
+  ), page as (
+    select * from changes order by seq limit p_limit + 1
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('table', t, 'seq', seq, 'row', r - 'server_seq' - 'server_updated_at') order by seq), '[]'), count(*)
+  into rows, total from page;
+
+  if total > p_limit then
+    rows := rows - p_limit;
+  end if;
+
+  return jsonb_build_object(
+    'changes', rows,
+    'next_cursor', coalesce((rows -> -1 ->> 'seq')::bigint, p_cursor),
+    'has_more', total > p_limit
+  );
+end $$;
+

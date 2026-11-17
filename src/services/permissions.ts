@@ -3,6 +3,7 @@ import type { User, UserRole } from '@/types/domain';
 export const PERMISSIONS = [
   { key: 'sales.create', label: 'Vender', group: 'Ventas' },
   { key: 'sales.discount', label: 'Aplicar descuentos', group: 'Ventas' },
+  { key: 'sales.promo_remove', label: 'Quitar la promo de efectivo en una venta', group: 'Ventas' },
   { key: 'sales.void', label: 'Ver ventas, devolver productos y cancelar tickets', group: 'Ventas' },
   { key: 'accounts.manage', label: 'Administrar cuentas de empleados', group: 'Ventas' },
   { key: 'cash.withdraw', label: 'Registrar retiros de caja', group: 'Caja' },
@@ -28,6 +29,7 @@ const ROLE_DEFAULTS: Record<Exclude<UserRole, 'owner'>, readonly PermissionKey[]
   manager: [
     'sales.create',
     'sales.discount',
+    'sales.promo_remove',
     'sales.void',
     'accounts.manage',
     'cash.withdraw',
