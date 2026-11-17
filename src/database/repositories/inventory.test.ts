@@ -4,7 +4,7 @@ import { db } from '../db';
 import { assignColumn, columnLetter, guessMapping, parseImportRows, readSpreadsheet, SpreadsheetError } from '@/services/spreadsheet';
 import { ensureCategory, listCategories } from './categories';
 import { listProductCosts } from './costs';
-import { InventoryError, listMovements, movementLabel, registerManualMovement, stockValuation, transferStock } from './inventory';
+import { InventoryError, listMovements, movementLabel, registerManualMovement, stockByCategory, stockValuation, transferStock } from './inventory';
 import { importProducts, previewImport } from './productImport';
 import { findProductByBarcode, saveProduct, type ProductInput } from './products';
 import { cancelPurchase, getPurchaseDetail, PurchaseError, savePurchase, type PurchaseInput } from './purchases';
@@ -81,6 +81,30 @@ describe('movimientos manuales', () => {
     await registerManualMovement({ storeId: ORO, product: p, reason: '', userId: null, kind: 'entry', quantity: 3 });
     await registerManualMovement({ storeId: ORO, product: q, reason: 'x', userId: null, kind: 'exit', quantity: 2 });
     expect(await stockValuation(ORO)).toEqual({ units: 3, costCents: 3000 });
+  });
+
+  it('resume la mercadería por categoría', async () => {
+    const bebidas = await ensureCategory('Bebidas');
+    const cig = await ensureCategory('Cigarrillos');
+    const fernet = await saveProduct({ ...base, category_id: bebidas.id });
+    const coca = await saveProduct({ ...base, name: 'Coca', barcodes: ['222'], category_id: bebidas.id, cost_cents: 500, price_cents: 900 });
+    const marlboro = await saveProduct({ ...base, name: 'Marlboro', barcodes: ['333'], category_id: cig.id, cost_cents: 2000, price_cents: 3000 });
+    const suelto = await saveProduct({ ...base, name: 'Suelto', barcodes: ['444'] });
+    const vacio = await saveProduct({ ...base, name: 'Vacío', barcodes: ['555'], category_id: cig.id });
+    await registerManualMovement({ storeId: ORO, product: fernet, reason: '', userId: null, kind: 'entry', quantity: 2 });
+    await registerManualMovement({ storeId: ORO, product: coca, reason: '', userId: null, kind: 'entry', quantity: 4 });
+    await registerManualMovement({ storeId: ORO, product: marlboro, reason: '', userId: null, kind: 'entry', quantity: 10 });
+    await registerManualMovement({ storeId: ORO, product: suelto, reason: '', userId: null, kind: 'entry', quantity: 1 });
+    await registerManualMovement({ storeId: ORO, product: vacio, reason: 'x', userId: null, kind: 'exit', quantity: 3 });
+    await registerManualMovement({ storeId: URI, product: coca, reason: '', userId: null, kind: 'entry', quantity: 50 });
+
+    const { rows, total } = await stockByCategory(ORO);
+    expect(rows.map((r) => [r.name, r.products, r.units, r.costCents, r.priceCents])).toEqual([
+      ['Cigarrillos', 1, 10, 20000, 30000],
+      ['Bebidas', 2, 6, 4000, 7600],
+      ['Sin categoría', 1, 1, 1000, 2000],
+    ]);
+    expect([total.products, total.units, total.costCents, total.priceCents]).toEqual([4, 17, 25000, 39600]);
   });
 });
 

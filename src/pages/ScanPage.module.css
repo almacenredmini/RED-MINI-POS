@@ -1,7 +1,13 @@
 .layout {
   display: grid;
   gap: 16px;
-  max-width: 640px;
+}
+
+/* En PC la pantalla queda centrada y angosta, como en el celular. */
+.page {
+  width: 100%;
+  max-width: 520px;
+  margin-inline: auto;
 }
 
 .result {

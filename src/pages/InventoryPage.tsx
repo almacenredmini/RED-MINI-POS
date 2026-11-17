@@ -3,7 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentStore, useDevice } from '@/contexts/DeviceContext';
 import { db } from '@/database/db';
-import { listMovements, movementLabel, stockValuation } from '@/database/repositories/inventory';
+import { listCategories } from '@/database/repositories/categories';
+import { listMovements, movementLabel, stockByCategory, type CategoryStock } from '@/database/repositories/inventory';
 import { effectiveMinStock, getAutoMinMap } from '@/database/repositories/minStock';
 import { searchProducts } from '@/database/repositories/products';
 import { getStockMap } from '@/database/repositories/stores';
@@ -16,36 +17,98 @@ import { MovementModal, type MovementMode } from '@/components/inventory/Movemen
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, EmptyState, StatCard } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Field';
+import { Input, Select } from '@/components/ui/Field';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { formatMoney } from '@/services/money';
 import type { Product } from '@/types/domain';
 import styles from '@/components/inventory/Inventory.module.css';
 
 const LIST_LIMIT = 200;
+/** Filtro de categoría: 'all' = todas, 'none' = sin categoría, o el id. */
+type CategoryFilter = 'all' | 'none' | string;
+const qtyText = (n: number) => String(n).replace('.', ',');
 
 function StockTab({ onProduct }: { onProduct: (p: Product) => void }) {
   const store = useCurrentStore();
   const { can } = useAuth();
   const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<CategoryFilter>('all');
   const q = useDebounce(query);
-  const products = useLiveQuery(() => searchProducts(q, LIST_LIMIT), [q], []);
+  const categories = useLiveQuery(listCategories, [], []);
+  const products = useLiveQuery(async () => {
+    if (category === 'all') return searchProducts(q, LIST_LIMIT);
+    const valid = new Set(categories.map((c) => c.id));
+    const all = await searchProducts(q, 100_000);
+    return all.filter((p) => (category === 'none' ? !p.category_id || !valid.has(p.category_id) : p.category_id === category)).slice(0, LIST_LIMIT);
+  }, [q, category, categories], []);
   const stock = useLiveQuery(() => getStockMap(store.id), [store.id], new Map<string, number>());
   const autoMin = useLiveQuery(() => getAutoMinMap(store.id), [store.id], new Map());
-  const value = useLiveQuery(() => stockValuation(store.id), [store.id], { units: 0, costCents: 0 });
+  const summary = useLiveQuery(() => stockByCategory(store.id), [store.id]);
+  const showCost = can('products.view_cost');
+  const zero: CategoryStock = { categoryId: null, name: '', products: 0, units: 0, costCents: 0, priceCents: 0 };
+  const current =
+    category === 'all' ? summary?.total : summary?.rows.find((r) => (category === 'none' ? r.categoryId === null : r.categoryId === category));
+  const shown = current ?? zero;
+  const categoryLabel = category === 'all' ? 'Todas las categorías' : category === 'none' ? 'Sin categoría' : (categories.find((c) => c.id === category)?.name ?? '');
 
   return (
     <>
-      <div className={styles.stats}>
-        <StatCard label="Unidades en stock" value={value.units} icon="inventory" />
-        {can('products.view_cost') && <StatCard label="Stock valorizado" value={formatMoney(value.costCents)} icon="store" highlight foot="A costo actual" />}
-      </div>
-      <div className={styles.search}>
+      <div className={styles.filters}>
+        <Select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filtrar por categoría">
+          <option value="all">Todas las categorías</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+          <option value="none">Sin categoría</option>
+        </Select>
         <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nombre o código…" autoComplete="off" aria-label="Buscar en inventario" />
       </div>
+      <div className={styles.stats}>
+        <StatCard label="Productos con stock" value={shown.products} icon="products" foot={categoryLabel} />
+        <StatCard label="Unidades" value={qtyText(shown.units)} icon="inventory" />
+        {showCost && <StatCard label="Valor a costo" value={formatMoney(shown.costCents)} icon="store" highlight foot="Lo que te costó" />}
+        <StatCard label="Valor a precio de venta" value={formatMoney(shown.priceCents)} icon="cash" foot="Si vendieras todo" />
+      </div>
+      {category === 'all' && summary && summary.rows.length > 0 && (
+        <Card title="Por categoría" className={styles.byCategory}>
+          <table className={styles.catTable}>
+            <thead>
+              <tr>
+                <th>Categoría</th>
+                <th className="num">Productos</th>
+                <th className="num">Unidades</th>
+                {showCost && <th className="num">Costo</th>}
+                <th className="num">Venta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.rows.map((r) => (
+                <tr key={r.categoryId ?? 'none'} onClick={() => setCategory(r.categoryId ?? 'none')} title="Ver esta categoría">
+                  <td>{r.name}</td>
+                  <td className="num">{r.products}</td>
+                  <td className="num">{qtyText(r.units)}</td>
+                  {showCost && <td className="num">{formatMoney(r.costCents)}</td>}
+                  <td className="num">{formatMoney(r.priceCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Total</td>
+                <td className="num">{summary.total.products}</td>
+                <td className="num">{qtyText(summary.total.units)}</td>
+                {showCost && <td className="num">{formatMoney(summary.total.costCents)}</td>}
+                <td className="num">{formatMoney(summary.total.priceCents)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </Card>
+      )}
       <Card className={styles.table}>
         {products.length === 0 ? (
-          <EmptyState icon="inventory" title={q ? 'Sin resultados' : 'Todavía no hay productos'} />
+          <EmptyState icon="inventory" title={q || category !== 'all' ? 'Sin resultados' : 'Todavía no hay productos'} />
         ) : (
           products.map((p) => {
             const qty = stock.get(p.id) ?? 0;

@@ -137,3 +137,46 @@ export async function stockValuation(storeId: UUID): Promise<{ units: number; co
   });
   return { units, costCents };
 }
+
+export interface CategoryStock {
+  /** `null` = productos sin categoría. */
+  categoryId: UUID | null;
+  name: string;
+  /** Productos con stock positivo. */
+  products: number;
+  units: number;
+  costCents: number;
+  priceCents: number;
+}
+
+/**
+ * Mercadería de la sucursal por categoría: cuántos productos con stock, cuántas unidades y cuánto
+ * vale a costo y a precio de venta. El stock negativo y los productos de stock ilimitado no suman.
+ */
+export async function stockByCategory(storeId: UUID): Promise<{ rows: CategoryStock[]; total: CategoryStock }> {
+  const [stock, products, categories] = await Promise.all([db.stock.where('store_id').equals(storeId).toArray(), db.products.toArray(), db.categories.toArray()]);
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const categoryName = new Map(categories.filter((c) => !c.deleted_at).map((c) => [c.id, c.name]));
+  const empty = (categoryId: UUID | null, name: string): CategoryStock => ({ categoryId, name, products: 0, units: 0, costCents: 0, priceCents: 0 });
+  const byCategory = new Map<string, CategoryStock>();
+  const total = empty(null, 'Todas');
+  for (const s of stock) {
+    const p = productById.get(s.product_id);
+    if (!p || p.deleted_at || !tracksStock(p) || s.quantity <= 0) continue;
+    const id = p.category_id && categoryName.has(p.category_id) ? p.category_id : null;
+    const key = id ?? '';
+    const row = byCategory.get(key) ?? empty(id, id ? categoryName.get(id)! : 'Sin categoría');
+    for (const r of [row, total]) {
+      r.products += 1;
+      r.units += s.quantity;
+      r.costCents += Math.round(s.quantity * (p.cost_cents ?? 0));
+      r.priceCents += Math.round(s.quantity * p.price_cents);
+    }
+    byCategory.set(key, row);
+  }
+  total.units = Math.round(total.units * 1000) / 1000;
+  const rows = [...byCategory.values()]
+    .map((r) => ({ ...r, units: Math.round(r.units * 1000) / 1000 }))
+    .sort((a, b) => (a.categoryId === null ? 1 : b.categoryId === null ? -1 : b.costCents - a.costCents || a.name.localeCompare(b.name, 'es')));
+  return { rows, total };
+}

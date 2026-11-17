@@ -250,7 +250,7 @@ button.row:hover {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -272,4 +272,63 @@ button.row:hover {
   gap: 4px;
   text-align: right;
   font-size: 0.88rem;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 600px) {
+  .filters {
+    grid-template-columns: 1fr;
+  }
+}
+
+.byCategory {
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.catTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.catTable th,
+.catTable td {
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.catTable th:global(.num),
+.catTable td:global(.num) {
+  text-align: right;
+}
+
+.catTable th {
+  color: var(--text-faint);
+  font-weight: 600;
+  font-size: 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.catTable tbody tr {
+  cursor: pointer;
+}
+
+.catTable tbody tr:hover {
+  background: var(--surface-2, rgba(255, 255, 255, 0.04));
+}
+
+.catTable tbody td {
+  border-bottom: 1px solid var(--border);
+}
+
+.catTable tfoot td {
+  font-weight: 700;
 }

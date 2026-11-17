@@ -70,7 +70,7 @@ export function ScanPage() {
   useKeyboardWedge({ onScan: (c) => void onCode(c) });
 
   return (
-    <>
+    <div className={styles.page}>
       <PageHeader title="Escanear" subtitle="Apuntá la cámara al código de barras" />
       <div className={styles.layout}>
         <CameraScanner onDetected={(c) => void onCode(c)} paused={result !== null} />
@@ -155,6 +155,6 @@ export function ScanPage() {
         )}
       </div>
       {promoFor && <ProductPromoModal product={promoFor} onClose={() => setPromoFor(null)} />}
-    </>
+    </div>
   );
 }
