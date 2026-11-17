@@ -13,7 +13,6 @@ const ProductEditPage = lazy(() => import('@/pages/ProductEditPage').then((m) =>
 const ScanPage = lazy(() => import('@/pages/ScanPage').then((m) => ({ default: m.ScanPage })));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const ReportsPage = lazy(() => import('@/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
-const SalesPage = lazy(() => import('@/pages/SalesPage').then((m) => ({ default: m.SalesPage })));
 const UsersPage = lazy(() => import('@/pages/UsersPage').then((m) => ({ default: m.UsersPage })));
 const AccountsPage = lazy(() => import('@/pages/AccountsPage').then((m) => ({ default: m.AccountsPage })));
 const InventoryPage = lazy(() => import('@/pages/InventoryPage').then((m) => ({ default: m.InventoryPage })));
@@ -40,8 +39,9 @@ export const router = createHashRouter([
       { path: 'escanear', element: <RequirePermission permission="products.edit"><ScanPage /></RequirePermission> },
       { path: 'ajustes', element: <RequirePermission permission="settings.manage"><SettingsPage /></RequirePermission> },
       { path: 'usuarios', element: <RequirePermission permission="users.manage"><UsersPage /></RequirePermission> },
-      { path: 'caja', element: <RequirePermission permission="sales.create"><CashPage /></RequirePermission> },
-      { path: 'ventas', element: <RequirePermission permission="sales.void"><SalesPage /></RequirePermission> },
+      { path: 'corte', element: <RequirePermission permission="cash.manage"><CashPage /></RequirePermission> },
+      { path: 'caja', element: <Navigate to="/corte" replace /> },
+      { path: 'ventas', element: <Navigate to="/vender" replace /> },
       { path: 'vender', element: <RequirePermission permission="sales.create"><PosPage /></RequirePermission> },
       { path: 'horarios', element: <RequirePermission permission="schedules.manage"><SchedulesPage /></RequirePermission> },
       { path: 'cuentas', element: <RequirePermission permission="accounts.manage"><AccountsPage /></RequirePermission> },

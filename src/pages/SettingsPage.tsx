@@ -33,10 +33,9 @@ export function SettingsPage() {
     <>
       <PageHeader title="Ajustes" subtitle="Configuración de este dispositivo" />
       <div className={styles.grid}>
-        {(can('users.manage') || can('sales.void') || can('stock.adjust') || can('purchases.manage') || can('accounts.manage')) && (
+        {(can('users.manage') || can('stock.adjust') || can('purchases.manage') || can('accounts.manage')) && (
           <Card title="Administración">
             <div className={styles.links}>
-              {can('sales.void') && <ButtonLink to="/ventas" icon="purchases">Ventas</ButtonLink>}
               {can('accounts.manage') && <ButtonLink to="/cuentas" icon="store">Cuentas</ButtonLink>}
               {can('stock.adjust') && <ButtonLink to="/inventario" icon="inventory">Inventario</ButtonLink>}
               {can('purchases.manage') && <ButtonLink to="/compras" icon="purchases">Compras</ButtonLink>}

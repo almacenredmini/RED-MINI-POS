@@ -1,3 +1,4 @@
+import type { DailyCut } from '@/database/repositories/cut';
 import type { SaleDetail } from '@/database/repositories/sales';
 import { formatMoney } from './money';
 import { PAYMENT_LABELS } from './payment';
@@ -116,4 +117,59 @@ export function printHtml(html: string): void {
     setTimeout(() => frame.remove(), 60_000);
   };
   document.body.appendChild(frame);
+}
+
+export interface CutTicket {
+  storeName: string;
+  /** Ej.: "domingo 15/11/2026". */
+  dayLabel: string;
+  /** "Todos" o el nombre del cajero. */
+  cashier: string;
+  cut: DailyCut;
+  showProfit: boolean;
+}
+
+/** Corte del día para la ticketera, con el mismo formato que el ticket de venta. */
+export function renderCutHtml({ storeName, dayLabel, cashier, cut, showProfit }: CutTicket, settings: PrintSettings = getPrintSettings()): string {
+  const narrow = settings.paper === 58;
+  const row = (label: string, value: number, sign = '') => `<div class="row"><span>${esc(label)}</span><span>${sign}${formatMoney(value)}</span></div>`;
+  const methods = Object.entries(cut.byMethod)
+    .filter(([, v]) => v)
+    .map(([m, v]) => row(PAYMENT_LABELS[m as keyof typeof PAYMENT_LABELS], v ?? 0))
+    .join('');
+  const moves = cut.movements.map((m) => row(m.reason, m.amount_cents, m.type === 'withdrawal' ? '-' : '+')).join('');
+  const cats = cut.byCategory.map((c) => row(c.label, c.total)).join('');
+  const printed = new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Corte</title><style>
+@page { size: ${settings.paper}mm auto; margin: 0; }
+html, body { margin: 0; padding: 0; }
+body { width: ${narrow ? 48 : 72}mm; margin: 0 auto; padding: 3mm 0 6mm; font: ${narrow ? 11 : 12}px/1.3 'Courier New', monospace; color: #000; background: #fff; }
+h1 { font-size: ${narrow ? 15 : 17}px; margin: 0 0 2px; text-align: center; }
+h2 { font-size: ${narrow ? 11 : 12}px; margin: 4px 0 2px; text-transform: uppercase; }
+.c { text-align: center; overflow-wrap: anywhere; } .row { display: flex; justify-content: space-between; gap: 6px; }
+.row span:first-child { overflow-wrap: anywhere; } .row span:last-child { white-space: nowrap; }
+hr { border: 0; border-top: 1px dashed #000; margin: 5px 0; }
+.total { font-size: ${narrow ? 13 : 15}px; font-weight: bold; }
+</style></head><body>
+<h1>CORTE DEL DÍA</h1>
+<div class="c">Sucursal ${esc(storeName)}</div>
+<div class="c">${esc(dayLabel)}</div>
+<div class="c">Cajero: ${esc(cashier)}</div>
+<hr><h2>Dinero en caja</h2>
+${row('Ventas en efectivo', cut.cashSales, '+')}
+${cut.deposits ? row('Entradas', cut.deposits, '+') : ''}
+${row('Retiros', cut.withdrawals, '-')}
+<div class="row total"><span>Total</span><span>${formatMoney(cut.cashInDrawer)}</span></div>
+<hr><h2>Pagos</h2>
+${methods || '<div>Sin ventas</div>'}
+${moves ? `<hr><h2>Retiros y entradas</h2>${moves}` : ''}
+${cats ? `<hr><h2>Ventas por categoría</h2>${cats}` : ''}
+<hr>
+<div class="row total"><span>VENTAS</span><span>${formatMoney(cut.salesTotal)}</span></div>
+<div class="row"><span>Tickets</span><span>${cut.tickets}</span></div>
+${cut.returns.count ? row(`Devoluciones (${cut.returns.count})`, cut.returns.total, '-') : ''}
+${cut.voided.count ? row(`Anulados (${cut.voided.count})`, cut.voided.total) : ''}
+${showProfit ? row('Ganancia', cut.profit) : ''}
+<hr><div class="c">Impreso ${esc(printed)}</div>
+</body></html>`;
 }

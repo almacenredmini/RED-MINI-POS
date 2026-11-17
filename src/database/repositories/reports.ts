@@ -161,8 +161,9 @@ export async function salesLines(storeId: string | null, from: string, to: strin
   return lines;
 }
 
-export async function salesReport(storeId: string | null, from: string, to: string): Promise<SalesReport> {
-  const all = await loadSales(storeId, from, to);
+/** `userId`: sólo las ventas de ese usuario y las devoluciones que hizo él (para el corte por cajero). */
+export async function salesReport(storeId: string | null, from: string, to: string, userId: string | null = null): Promise<SalesReport> {
+  const all = (await loadSales(storeId, from, to)).filter((s) => userId === null || s.user_id === userId);
   const sales = all.filter((s) => s.status === 'completed');
   const voided = all.filter((s) => s.status === 'voided');
   const ids = sales.map((s) => s.id);
@@ -236,7 +237,9 @@ export async function salesReport(storeId: string | null, from: string, to: stri
   }
 
   // Devoluciones: restan el día y la hora en que se hicieron; el vendedor sigue siendo el del ticket.
-  const { returns: allReturns, saleById: returnSales } = await loadReturns(storeId, from, to);
+  const loaded = await loadReturns(storeId, from, to);
+  const allReturns = loaded.returns.filter((r) => userId === null || r.user_id === userId);
+  const returnSales = loaded.saleById;
   const returns = { count: 0, total: 0 };
   let returnedCost = 0;
   for (const r of allReturns) {

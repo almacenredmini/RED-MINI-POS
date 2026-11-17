@@ -3,6 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentStore, useDevice } from '@/contexts/DeviceContext';
 import { cashSummary, difference, getOpenSession, listOpenSessions, listSessions } from '@/database/repositories/cash';
+import { dailyCut, type DailyCut } from '@/database/repositories/cut';
+import { db } from '@/database/db';
+import { PAYMENT_LABELS } from '@/services/payment';
+import { printHtml, renderCutHtml } from '@/services/ticket';
+import type { PaymentMethod } from '@/types/domain';
 import { CashDetail, CashDetailModal, CloseCashModal, DifferenceBadge, MovementList, useUserNames, WithdrawModal } from '@/components/cash/CashModals';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -30,29 +35,68 @@ export function CashPage() {
   const mine = open && open.opened_by === user?.id;
   const ownMovements = summary?.movements.filter((m) => manager || m.user_id === user?.id) ?? [];
 
+  const [day, setDay] = useState(() => toInputDate(new Date()));
+  const [cashierId, setCashierId] = useState('');
+  const cashiers = useLiveQuery(
+    async () => (await db.users.toArray()).filter((u) => u.active && (u.store_id === null || u.store_id === store.id)).sort((a, b) => a.name.localeCompare(b.name, 'es')),
+    [store.id],
+    [],
+  );
+  const cut = useLiveQuery(() => dailyCut(store.id, day, cashierId || null), [store.id, day, cashierId]);
+  const showProfit = can('products.view_cost');
+  const dayLabel = new Date(`${day}T00:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const cashierName = cashierId ? (cashiers.find((u) => u.id === cashierId)?.name ?? '') : 'Todos';
+
+  const print = () => {
+    if (cut) printHtml(renderCutHtml({ storeName: store.name, dayLabel, cashier: cashierName, cut, showProfit }));
+  };
+
   return (
     <>
       <PageHeader
-        title="Caja"
-        subtitle="De este dispositivo"
+        title="Corte"
+        subtitle={`Sucursal ${store.name}`}
         actions={
-          open && (
-            <>
-              {can('cash.withdraw') && (
-                <Button icon="minus" onClick={() => setWithdrawing(true)}>
-                  Retiro
-                </Button>
-              )}
-              {manager && (
-                <Button variant="primary" onClick={() => setClosing(open)}>
-                  Cerrar caja
-                </Button>
-              )}
-            </>
-          )
+          <>
+            <Button icon="reports" onClick={print} disabled={!cut}>
+              Imprimir corte
+            </Button>
+            {open && can('cash.withdraw') && (
+              <Button icon="minus" onClick={() => setWithdrawing(true)}>
+                Retiro
+              </Button>
+            )}
+            {open && manager && (
+              <Button variant="primary" onClick={() => setClosing(open)}>
+                Cerrar caja
+              </Button>
+            )}
+          </>
         }
       />
 
+      <div className={styles.filters}>
+        <label className={styles.filter}>
+          <span>Día</span>
+          <Input type="date" value={day} max={toInputDate(new Date())} onChange={(e) => e.target.value && setDay(e.target.value)} />
+        </label>
+        <label className={styles.filter}>
+          <span>Del cajero</span>
+          <Select value={cashierId} onChange={(e) => setCashierId(e.target.value)}>
+            <option value="">Todos</option>
+            {cashiers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </Select>
+        </label>
+      </div>
+
+      <h2 className={styles.dayTitle}>Corte del {dayLabel}</h2>
+      {cut && <CutView cut={cut} showProfit={showProfit} names={names} />}
+
+      <h2 className={styles.dayTitle}>Cajas abiertas</h2>
       <div className={styles.grid}>
         <Card title="Caja actual" action={open ? <Badge tone="success" dot>Abierta</Badge> : <Badge>Sin abrir</Badge>}>
           {!open ? (
@@ -82,6 +126,100 @@ export function CashPage() {
 
       {withdrawing && open && <WithdrawModal session={open} onClose={() => setWithdrawing(false)} />}
       {closing && <CloseCashModal session={closing} onCancel={() => setClosing(null)} onClosed={() => setClosing(null)} />}
+    </>
+  );
+}
+
+const METHOD_ORDER: PaymentMethod[] = ['cash', 'card', 'debit', 'credit', 'transfer', 'mercadopago'];
+
+function CutView({ cut, showProfit, names }: { cut: DailyCut; showProfit: boolean; names: Map<string, string> }) {
+  const line = (label: string, value: number, sign = '') => (
+    <div key={label} className={styles.line}>
+      <span>{label}</span>
+      <span className="num">
+        {sign}
+        {formatMoney(value)}
+      </span>
+    </div>
+  );
+  const methods = METHOD_ORDER.filter((m) => cut.byMethod[m]);
+  const account = cut.byMethod.employee_account ?? 0;
+  return (
+    <>
+      <div className={styles.cutGrid}>
+        <Card title="Dinero en caja">
+          {line('Ventas en efectivo', cut.cashSales, '+ ')}
+          {cut.deposits > 0 && line('Entradas', cut.deposits, '+ ')}
+          {line('Retiros', cut.withdrawals, '− ')}
+          <div className={`${styles.line} ${styles.lineTotal}`}>
+            <span>Total</span>
+            <span className="num">{formatMoney(cut.cashInDrawer)}</span>
+          </div>
+        </Card>
+
+        <Card title="Pagos">
+          {methods.length === 0 && account === 0 ? (
+            <p className="muted">Sin ventas.</p>
+          ) : (
+            <>
+              {methods.map((m) => line(PAYMENT_LABELS[m], cut.byMethod[m] ?? 0))}
+              <div className={`${styles.line} ${styles.lineTotal}`}>
+                <span>Cobrado</span>
+                <span className="num">{formatMoney(cut.paidNow)}</span>
+              </div>
+              {account !== 0 && line('A cuenta de empleados', account)}
+            </>
+          )}
+        </Card>
+
+        <Card title="Ventas por categoría">
+          {cut.byCategory.length === 0 ? <p className="muted">Sin ventas.</p> : <div className={styles.scrollList}>{cut.byCategory.map((c) => line(c.label, c.total))}</div>}
+        </Card>
+
+        <Card title="Retiros y entradas">
+          {cut.movements.length === 0 ? (
+            <p className="muted">Sin retiros.</p>
+          ) : (
+            <div className={styles.scrollList}>
+              {cut.movements.map((m) => (
+                <div key={m.id} className={styles.line}>
+                  <span>
+                    {m.reason}
+                    <span className="muted">
+                      {' · '}
+                      {new Date(m.occurred_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                      {m.user_id && names.get(m.user_id) ? ` · ${names.get(m.user_id)}` : ''}
+                    </span>
+                  </span>
+                  <span className="num">
+                    {m.type === 'withdrawal' ? '− ' : '+ '}
+                    {formatMoney(m.amount_cents)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <div className={styles.totals}>
+        <div>
+          <span className={styles.totalLabel}>Ventas totales</span>
+          <strong className={`num ${styles.totalValue}`}>{formatMoney(cut.salesTotal)}</strong>
+          <span className="muted">
+            {cut.tickets} {cut.tickets === 1 ? "ticket" : "tickets"}
+            {cut.returns.count > 0 && ` · ${cut.returns.count} devoluciones (−${formatMoney(cut.returns.total)})`}
+            {cut.voided.count > 0 && ` · ${cut.voided.count} anulados`}
+          </span>
+        </div>
+        {showProfit && (
+          <div>
+            <span className={styles.totalLabel}>Ganancia del día</span>
+            <strong className={`num ${styles.totalValue}`}>{formatMoney(cut.profit)}</strong>
+            <span className="muted">Venta − costo de lo vendido</span>
+          </div>
+        )}
+      </div>
     </>
   );
 }

@@ -16,8 +16,6 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { to: '/inicio', label: 'Inicio', icon: 'dashboard', permission: 'reports.view', mobile: true },
   { to: '/vender', label: 'Vender', icon: 'pos', permission: 'sales.create', mobile: true },
-  { to: '/caja', label: 'Caja', icon: 'cash', permission: 'sales.create' },
-  { to: '/ventas', label: 'Ventas', icon: 'purchases', permission: 'sales.void' },
   { to: '/cuentas', label: 'Cuentas', icon: 'store', permission: 'accounts.manage', secondary: true },
   { to: '/escanear', label: 'Escanear', icon: 'scan', permission: 'products.edit', mobile: true },
   { to: '/productos', label: 'Productos', icon: 'products', permission: 'products.edit', mobile: true },
@@ -27,4 +25,5 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/horarios', label: 'Horarios', icon: 'calendar', permission: 'schedules.manage', secondary: true },
   { to: '/usuarios', label: 'Usuarios', icon: 'store', permission: 'users.manage', secondary: true },
   { to: '/ajustes', label: 'Ajustes', icon: 'settings', permission: 'settings.manage', secondary: true },
+  { to: '/corte', label: 'Corte', icon: 'cash', permission: 'cash.manage' },
 ];

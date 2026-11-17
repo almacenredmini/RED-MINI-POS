@@ -4,6 +4,8 @@ import { useCurrentStore } from '@/contexts/DeviceContext';
 import { useToast } from '@/contexts/ToastContext';
 import { db } from '@/database/db';
 import { AccountError } from '@/database/repositories/accounts';
+import { getOpenSession } from '@/database/repositories/cash';
+import { WithdrawModal } from '@/components/cash/CashModals';
 import { findProductByBarcode } from '@/database/repositories/products';
 import { createSale } from '@/database/repositories/sales';
 import { useCart } from '@/hooks/useCart';
@@ -48,6 +50,8 @@ export function PosPage() {
   const toast = useToast();
   const { cart, setCart, loaded } = useCart();
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const openCash = useLiveQuery(() => getOpenSession(), []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [lastScan, setLastScan] = useState<string | null>(null);
   const [saleId, setSaleId] = useState(uuidv7);
@@ -254,7 +258,13 @@ export function PosPage() {
               Vaciar
             </Button>
           )}
+          {openCash && can('cash.withdraw') && (
+            <Button variant="ghost" icon="minus" onClick={() => setWithdrawing(true)}>
+              Retiro
+            </Button>
+          )}
         </div>
+        {withdrawing && openCash && <WithdrawModal session={openCash} onClose={() => setWithdrawing(false)} />}
 
         {loaded && cart.lines.length === 0 ? (
           <EmptyState icon="scan" title="Escaneá un producto para empezar">
