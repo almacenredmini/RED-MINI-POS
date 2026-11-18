@@ -59,6 +59,16 @@ export function ProductsPage() {
         actions={
           <>
             <Button onClick={() => setEditingCategories(true)}>Categorías</Button>
+            {can('products.edit_price') && (
+              <Button icon="cash" onClick={() => navigate('/productos/promociones')}>
+                Promociones
+              </Button>
+            )}
+            {can('sales.discount') && (
+              <Button icon="cash" onClick={() => navigate('/productos/descuentos')}>
+                Descuentos
+              </Button>
+            )}
             <Button icon="scan" onClick={() => setScanning(true)}>
               Escanear
             </Button>

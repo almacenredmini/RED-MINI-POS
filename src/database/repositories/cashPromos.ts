@@ -6,22 +6,34 @@ import type { CashPromo, UUID } from '@/types/domain';
 
 export class PromoError extends Error {}
 
-export type PromoInput = Pick<CashPromo, 'active' | 'percent' | 'days' | 'from_time' | 'to_time' | 'round_cents' | 'excluded_category_ids'>;
+export type PromoInput = Pick<CashPromo, 'active' | 'percent' | 'days' | 'from_time' | 'to_time' | 'round_cents'> & Required<Pick<CashPromo, 'methods' | 'category_mode' | 'category_ids'>>;
 
-/** Promos de efectivo de la sucursal (activas y pausadas). */
+/** Descuentos de la sucursal (activos y pausados). */
 export async function listPromos(storeId: UUID): Promise<CashPromo[]> {
   return (await db.cash_promos.where('store_id').equals(storeId).toArray()).filter((p) => !p.deleted_at).sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
-function check(input: PromoInput): PromoInput {
+function check(input: PromoInput): PromoInput & Pick<CashPromo, 'excluded_category_ids'> {
   if (!(input.percent > 0 && input.percent < 100)) throw new PromoError('El porcentaje tiene que ser entre 1 y 99');
+  if (input.methods.length === 0) throw new PromoError('Elegí al menos una forma de pago');
+  if (input.category_mode !== 'all' && input.category_ids.length === 0) throw new PromoError('Elegí al menos una categoría');
   if (input.days.length === 0) throw new PromoError('Elegí al menos un día');
   const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
   const from = input.from_time || null;
   const to = input.to_time || null;
   if (!!from !== !!to) throw new PromoError('Completá el horario de inicio y de fin, o dejá los dos vacíos');
   if ((from && !hhmm.test(from)) || (to && !hhmm.test(to))) throw new PromoError('El horario va como 14:00');
-  return { ...input, from_time: from, to_time: to, days: [...new Set(input.days)].sort((a, b) => a - b) };
+  const categoryIds = input.category_mode === 'all' ? [] : [...new Set(input.category_ids)];
+  return {
+    ...input,
+    from_time: from,
+    to_time: to,
+    days: [...new Set(input.days)].sort((a, b) => a - b),
+    methods: [...new Set(input.methods)],
+    category_ids: categoryIds,
+    // Para dispositivos con la versión anterior, que sólo entienden "efectivo, todo menos estas".
+    excluded_category_ids: input.category_mode === 'except' ? categoryIds : [],
+  };
 }
 
 async function put(p: CashPromo) {

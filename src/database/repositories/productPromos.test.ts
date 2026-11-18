@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../db';
 import { addLine, cartTotals, changeQuantity, EMPTY_CART } from '@/services/cart';
-import { promoBase } from '@/services/cashPromo';
+import { computeDiscount } from '@/services/cashPromo';
 import { computePayment } from '@/services/payment';
 import { uuidv7 } from '@/services/id';
 import { promoForLine, withProductPromos } from '@/services/productPromo';
@@ -50,7 +50,8 @@ describe('promo por cantidad', () => {
     const priced = withProductPromos(cartOf(p.id, 3), await listProductPromos(ORO.id, undefined, '2026-11-17'), '2026-11-17');
     expect(cartTotals(priced).total).toBe(270000);
     // No se suma la promo de efectivo sobre algo que ya tiene promo.
-    expect(promoBase(priced.lines, () => null, {})).toBe(0);
+    const cashPromo = { id: 'c', store_id: ORO.id, active: true, percent: 10, days: [0, 1, 2, 3, 4, 5, 6], from_time: null, to_time: null, round_cents: 0, created_at: '', updated_at: '', deleted_at: null, version: 1, updated_by_device: 'd' };
+    expect(computeDiscount(priced.lines, () => null, [cashPromo], 'cash')).toBeNull();
     const { sale, items } = await createSale({ id: uuidv7(), store: ORO, userId: null, cart: priced, payments: computePayment('cash', 270000, null).payments });
     expect(sale.total_cents).toBe(270000);
     expect(items[0]).toMatchObject({ unit_price_cents: 90000, discount_cents: 30000, total_cents: 270000 });

@@ -259,7 +259,7 @@ function Report({ report, start, days, showCost, allStores }: { report: SalesRep
           label="Descuentos"
           value={formatMoney(report.discount)}
           icon="minus"
-          foot={report.promoDiscount > 0 ? `Promo efectivo ${formatMoney(report.promoDiscount)} · manuales ${formatMoney(report.discount - report.promoDiscount)}` : 'Ya restados de las ventas'}
+          foot={report.promoDiscount > 0 ? `Por forma de pago ${formatMoney(report.promoDiscount)} · manuales ${formatMoney(report.discount - report.promoDiscount)}` : 'Ya restados de las ventas'}
         />
       </div>
 

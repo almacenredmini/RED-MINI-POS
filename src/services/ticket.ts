@@ -120,6 +120,8 @@ export function printHtml(html: string): void {
 }
 
 export interface CutTicket {
+  /** Por defecto "CORTE DEL DÍA". */
+  title?: string;
   storeName: string;
   /** Ej.: "domingo 15/11/2026". */
   dayLabel: string;
@@ -130,7 +132,7 @@ export interface CutTicket {
 }
 
 /** Corte del día para la ticketera, con el mismo formato que el ticket de venta. */
-export function renderCutHtml({ storeName, dayLabel, cashier, cut, showProfit }: CutTicket, settings: PrintSettings = getPrintSettings()): string {
+export function renderCutHtml({ title = 'CORTE DEL DÍA', storeName, dayLabel, cashier, cut, showProfit }: CutTicket, settings: PrintSettings = getPrintSettings()): string {
   const narrow = settings.paper === 58;
   const row = (label: string, value: number, sign = '') => `<div class="row"><span>${esc(label)}</span><span>${sign}${formatMoney(value)}</span></div>`;
   const methods = Object.entries(cut.byMethod)
@@ -151,7 +153,7 @@ h2 { font-size: ${narrow ? 11 : 12}px; margin: 4px 0 2px; text-transform: upperc
 hr { border: 0; border-top: 1px dashed #000; margin: 5px 0; }
 .total { font-size: ${narrow ? 13 : 15}px; font-weight: bold; }
 </style></head><body>
-<h1>CORTE DEL DÍA</h1>
+<h1>${esc(title)}</h1>
 <div class="c">Sucursal ${esc(storeName)}</div>
 <div class="c">${esc(dayLabel)}</div>
 <div class="c">Cajero: ${esc(cashier)}</div>
@@ -160,6 +162,7 @@ ${row('Ventas en efectivo', cut.cashSales, '+')}
 ${cut.deposits ? row('Entradas', cut.deposits, '+') : ''}
 ${row('Retiros', cut.withdrawals, '-')}
 <div class="row total"><span>Total</span><span>${formatMoney(cut.cashInDrawer)}</span></div>
+${typeof cut.counted === 'number' ? `${row('Contó', cut.counted)}${row('Diferencia', cut.counted - cut.cashInDrawer)}` : ''}
 <hr><h2>Pagos</h2>
 ${methods || '<div>Sin ventas</div>'}
 ${moves ? `<hr><h2>Retiros y entradas</h2>${moves}` : ''}

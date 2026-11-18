@@ -38,3 +38,23 @@ export async function setCategoryPerishable(id: string, perishable: boolean): Pr
     await enqueue('categories', id, 'upsert', next);
   });
 }
+
+export class CategoryError extends Error {}
+
+/** Cambia el nombre de una categoría. No deja repetir el de otra (sin distinguir acentos/mayúsculas). */
+export async function renameCategory(id: string, name: string): Promise<void> {
+  const clean = name.trim().replace(/\s+/g, ' ');
+  if (!clean) throw new CategoryError('Escribí el nombre');
+  const deviceId = await getDeviceId();
+  const key = normalize(clean);
+  await db.transaction('rw', db.categories, db.sync_queue, async () => {
+    const current = await db.categories.get(id);
+    if (!current || current.deleted_at !== null) throw new CategoryError('La categoría no existe');
+    if (current.name === clean) return;
+    const taken = await db.categories.filter((c) => c.id !== id && c.deleted_at === null && normalize(c.name) === key).first();
+    if (taken) throw new CategoryError(`Ya existe la categoría ${taken.name}`);
+    const next = touchMeta({ ...current, name: clean }, deviceId);
+    await db.categories.put(next);
+    await enqueue('categories', id, 'upsert', next);
+  });
+}

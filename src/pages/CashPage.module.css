@@ -181,3 +181,31 @@
   font-weight: 800;
   color: var(--accent);
 }
+
+.filterWide {
+  flex: 1 1 320px;
+  max-width: 520px;
+}
+
+.viewSwitch {
+  display: inline-flex;
+  align-self: flex-end;
+  padding: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+.viewSwitch button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: calc(var(--radius-md) - 3px);
+  background: transparent;
+  color: inherit;
+  font-weight: 600;
+}
+
+.viewSwitch .viewOn {
+  background: var(--accent);
+  color: var(--accent-text);
+}

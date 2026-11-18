@@ -504,8 +504,8 @@ describe('otras operaciones', () => {
     expect(res.rows[0]?.status).toBe('cancelled');
   });
 
-  it('la promo de efectivo y la venta con promo llegan a los demás dispositivos', async () => {
-    await savePromo(ORO.id, { active: true, percent: 10, days: [1, 2, 3], from_time: '14:00', to_time: '18:00', round_cents: 10000, excluded_category_ids: ['01930000-0000-7000-8000-0000000000c1'] });
+  it('los descuentos y la venta con descuento llegan a los demás dispositivos', async () => {
+    await savePromo(ORO.id, { active: true, percent: 10, methods: ['cash', 'transfer'], category_mode: 'except', category_ids: ['01930000-0000-7000-8000-0000000000c1'], days: [1, 2, 3], from_time: '14:00', to_time: '18:00', round_cents: 10000 });
     const p = await saveProduct(base);
     const cart = { ...addLine(EMPTY_CART, { product_id: p.id, name: 'Fernet', barcode: '111', unit: 'unit', unit_price_cents: 2000, unit_cost_cents: 1000 }), discount: { type: 'amount' as const, value: 200, label: 'Promo efectivo 10%' } };
     const { sale } = await createSale({ id: uuidv7(), store: ORO, userId: null, cart, payments: computePayment('cash', 1800, null).payments });
@@ -516,7 +516,9 @@ describe('otras operaciones', () => {
 
     await newDevice();
     await sync(ORO.id);
-    expect(await listPromos(ORO.id)).toMatchObject([{ percent: 10, days: [1, 2, 3], from_time: '14:00', round_cents: 10000, excluded_category_ids: ['01930000-0000-7000-8000-0000000000c1'] }]);
+    expect(await listPromos(ORO.id)).toMatchObject([
+      { percent: 10, methods: ['cash', 'transfer'], category_mode: 'except', category_ids: ['01930000-0000-7000-8000-0000000000c1'], days: [1, 2, 3], from_time: '14:00', round_cents: 10000, excluded_category_ids: ['01930000-0000-7000-8000-0000000000c1'] },
+    ]);
     expect(await db.sales.get(sale.id)).toMatchObject({ discount_cents: 200, discount_label: 'Promo efectivo 10%', total_cents: 1800 });
   });
 

@@ -3,9 +3,9 @@ import { db } from '../db';
 import { addCommonLine, addLine, cartTotals, EMPTY_CART, type Cart } from '@/services/cart';
 import { computePayment } from '@/services/payment';
 import { uuidv7 } from '@/services/id';
-import { addCashMovement } from './cash';
+import { addCashMovement, closeSession } from './cash';
 import { ensureCategory } from './categories';
-import { dailyCut } from './cut';
+import { dailyCut, recentShifts, shiftCut } from './cut';
 import { localDay } from './reports';
 import { saveProduct, type ProductInput } from './products';
 import { createSale } from './sales';
@@ -52,5 +52,38 @@ describe('corte del día', () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     expect((await dailyCut(store.id, localDay(yesterday), null)).salesTotal).toBe(0);
+  });
+});
+
+describe('corte por turno', () => {
+  it('un turno que pasa la medianoche queda entero, con lo que contó el cajero', async () => {
+    const p = await saveProduct(base);
+    const s1 = await sell(cartFor(p.id, 'Fernet', 1000, 600), 'vicky');
+    const s2 = await sell(cartFor(p.id, 'Fernet', 500, 300), 'vicky', 'card');
+    const shift = s1.sale.cash_session_id!;
+    const w = await addCashMovement({ sessionId: shift, type: 'withdrawal', amount: 300, reason: 'Hielo', userId: 'vicky' });
+    await closeSession(shift, 650, 'vicky');
+    const s3 = await sell(cartFor(p.id, 'Fernet', 200, 100), 'beto');
+    expect(s3.sale.cash_session_id).not.toBe(shift);
+
+    // Vicky trabajó del 17 a las 22 al 18 a las 2; Beto entró el 18 a las 10.
+    const iso = (s: string) => new Date(s).toISOString();
+    await db.cash_sessions.update(shift, { opened_at: iso('2026-11-17T22:00:00'), closed_at: iso('2026-11-18T02:00:00') });
+    await db.cash_sessions.update(s3.sale.cash_session_id!, { opened_at: iso('2026-11-18T10:00:00') });
+    await db.sales.update(s1.sale.id, { occurred_at: iso('2026-11-17T23:00:00') });
+    await db.sales.update(s2.sale.id, { occurred_at: iso('2026-11-18T01:00:00') });
+    await db.sales.update(s3.sale.id, { occurred_at: iso('2026-11-18T10:30:00') });
+    await db.cash_movements.update(w.id, { occurred_at: iso('2026-11-18T00:30:00') });
+
+    const vicky = (await shiftCut(shift))!;
+    expect([vicky.salesTotal, vicky.tickets, vicky.cashSales, vicky.withdrawals, vicky.cashInDrawer, vicky.counted]).toEqual([1500, 2, 1000, 300, 700, 650]);
+    expect(vicky.byMethod).toEqual({ cash: 1000, card: 500 });
+    const beto = (await shiftCut(s3.sale.cash_session_id!))!;
+    expect([beto.salesTotal, beto.counted]).toEqual([200, null]);
+
+    // Por día, en cambio, el turno de Vicky queda partido en dos.
+    expect((await dailyCut(store.id, '2026-11-17', null)).salesTotal).toBe(1000);
+    expect((await dailyCut(store.id, '2026-11-18', null)).salesTotal).toBe(700);
+    expect((await recentShifts(store.id, 100000)).map((s) => s.id)).toEqual([s3.sale.cash_session_id, shift]);
   });
 });

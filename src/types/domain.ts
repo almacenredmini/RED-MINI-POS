@@ -207,9 +207,17 @@ export interface CashPromo extends SyncMeta {
   to_time: string | null;
   /** Múltiplo al que se redondea lo que paga (10000 = $100); 0 = sin redondeo. */
   round_cents: number;
-  /** Categorías sin promo (ej. cigarrillos): se cobran a precio lleno. */
+  /** Formato viejo (antes de 0023): categorías sin promo. Se lee sólo si no hay `category_mode`. */
   excluded_category_ids?: UUID[];
+  /** Formas de pago con las que vale. Sin dato = sólo efectivo (las promos viejas). */
+  methods?: DiscountMethod[];
+  /** 'all' = todo, 'only' = sólo `category_ids`, 'except' = todo menos `category_ids`. */
+  category_mode?: 'all' | 'only' | 'except';
+  category_ids?: UUID[];
 }
+
+/** Formas de pago a las que se les puede atar un descuento. */
+export type DiscountMethod = 'cash' | 'card' | 'transfer';
 
 /**
  * Promo por cantidad: el producto vale `unit_price_cents` c/u cuando se llevan entre `min_qty` y

@@ -3,7 +3,7 @@ import type { User, UserRole } from '@/types/domain';
 export const PERMISSIONS = [
   { key: 'sales.create', label: 'Vender', group: 'Ventas' },
   { key: 'sales.discount', label: 'Aplicar descuentos', group: 'Ventas' },
-  { key: 'sales.promo_remove', label: 'Quitar la promo de efectivo en una venta', group: 'Ventas' },
+  { key: 'sales.promo_remove', label: 'Quitar el descuento por forma de pago en una venta', group: 'Ventas' },
   { key: 'sales.void', label: 'Ver ventas, devolver productos y cancelar tickets', group: 'Ventas' },
   { key: 'accounts.manage', label: 'Administrar cuentas de empleados', group: 'Ventas' },
   { key: 'accounts.view_balance', label: 'Ver el saldo de las cuentas de empleados al cobrar', group: 'Ventas' },

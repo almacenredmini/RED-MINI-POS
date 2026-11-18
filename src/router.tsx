@@ -11,6 +11,8 @@ import { PosPage } from '@/pages/PosPage';
 const ProductsPage = lazy(() => import('@/pages/ProductsPage').then((m) => ({ default: m.ProductsPage })));
 const ProductEditPage = lazy(() => import('@/pages/ProductEditPage').then((m) => ({ default: m.ProductEditPage })));
 const ScanPage = lazy(() => import('@/pages/ScanPage').then((m) => ({ default: m.ScanPage })));
+const PromotionsPage = lazy(() => import('@/pages/PromotionsPage').then((m) => ({ default: m.PromotionsPage })));
+const DiscountsPage = lazy(() => import('@/pages/DiscountsPage').then((m) => ({ default: m.DiscountsPage })));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const ReportsPage = lazy(() => import('@/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const UsersPage = lazy(() => import('@/pages/UsersPage').then((m) => ({ default: m.UsersPage })));
@@ -34,6 +36,8 @@ export const router = createHashRouter([
       { index: true, element: <Navigate to="/vender" replace /> },
       { path: 'inicio', element: <RequirePermission permission="reports.view"><DashboardPage /></RequirePermission> },
       { path: 'productos', element: <RequirePermission permission="products.edit"><ProductsPage /></RequirePermission> },
+      { path: 'productos/promociones', element: <RequirePermission permission="products.edit_price"><PromotionsPage /></RequirePermission> },
+      { path: 'productos/descuentos', element: <RequirePermission permission="sales.discount"><DiscountsPage /></RequirePermission> },
       { path: 'productos/nuevo', element: <RequirePermission permission="products.edit"><ProductEditPage /></RequirePermission> },
       { path: 'productos/:id', element: <RequirePermission permission="products.edit"><ProductEditPage /></RequirePermission> },
       { path: 'escanear', element: <RequirePermission permission="products.edit"><ScanPage /></RequirePermission> },

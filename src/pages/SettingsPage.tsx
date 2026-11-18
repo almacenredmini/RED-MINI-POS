@@ -4,7 +4,6 @@ import { useDevice } from '@/contexts/DeviceContext';
 import { useToast } from '@/contexts/ToastContext';
 import { Card } from '@/components/ui/Card';
 import { SyncCard } from '@/components/sync/SyncCard';
-import { CashPromoCard } from '@/components/promos/CashPromoCard';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Badge';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -43,7 +42,6 @@ export function SettingsPage() {
             </div>
           </Card>
         )}
-        {can('sales.discount') && <CashPromoCard />}
         <SyncCard />
         {user?.role === 'owner' && <BackupCard />}
         <Card title="Sucursal">

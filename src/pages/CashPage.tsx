@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentStore, useDevice } from '@/contexts/DeviceContext';
 import { cashSummary, difference, getOpenSession, listOpenSessions, listSessions } from '@/database/repositories/cash';
-import { dailyCut, type DailyCut } from '@/database/repositories/cut';
+import { dailyCut, recentShifts, shiftCut, type DailyCut } from '@/database/repositories/cut';
 import { db } from '@/database/db';
 import { PAYMENT_LABELS } from '@/services/payment';
 import { printHtml, renderCutHtml } from '@/services/ticket';
@@ -35,20 +35,37 @@ export function CashPage() {
   const mine = open && open.opened_by === user?.id;
   const ownMovements = summary?.movements.filter((m) => manager || m.user_id === user?.id) ?? [];
 
+  // Por turno (una caja, aunque pase la medianoche) o por día calendario.
+  const [view, setView] = useState<'shift' | 'day'>('shift');
   const [day, setDay] = useState(() => toInputDate(new Date()));
   const [cashierId, setCashierId] = useState('');
+  const [shiftId, setShiftId] = useState('');
   const cashiers = useLiveQuery(
     async () => (await db.users.toArray()).filter((u) => u.active && (u.store_id === null || u.store_id === store.id)).sort((a, b) => a.name.localeCompare(b.name, 'es')),
     [store.id],
     [],
   );
-  const cut = useLiveQuery(() => dailyCut(store.id, day, cashierId || null), [store.id, day, cashierId]);
+  const shifts = useLiveQuery(() => recentShifts(store.id), [store.id], []);
+  // Sin elegir, el turno más reciente.
+  const shift = shifts.find((s) => s.id === shiftId) ?? shifts[0];
+  const cut = useLiveQuery(
+    () => (view === 'shift' ? (shift ? shiftCut(shift.id) : null) : dailyCut(store.id, day, cashierId || null)),
+    [view, shift?.id, shift?.closed_at, store.id, day, cashierId],
+  );
   const showProfit = can('products.view_cost');
   const dayLabel = new Date(`${day}T00:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const cashierName = cashierId ? (cashiers.find((u) => u.id === cashierId)?.name ?? '') : 'Todos';
+  const shiftOwner = (s: CashSession) => (s.opened_by ? (names.get(s.opened_by) ?? 'Usuario borrado') : 'Sin usuario');
+  const shiftLabel = (s: CashSession) => `${shiftOwner(s)} · ${hour(s.opened_at)} a ${s.closed_at ? hour(s.closed_at) : 'ahora (abierto)'}`;
+  const title = view === 'shift' ? (shift ? `Turno de ${shiftLabel(shift)}` : 'Sin turnos') : `Corte del ${dayLabel}`;
 
   const print = () => {
-    if (cut) printHtml(renderCutHtml({ storeName: store.name, dayLabel, cashier: cashierName, cut, showProfit }));
+    if (!cut) return;
+    if (view === 'shift' && shift) {
+      const range = `${hour(shift.opened_at)} a ${shift.closed_at ? hour(shift.closed_at) : 'ahora'}`;
+      printHtml(renderCutHtml({ title: 'CORTE DE TURNO', storeName: store.name, dayLabel: range, cashier: shiftOwner(shift), cut, showProfit }));
+    } else {
+      printHtml(renderCutHtml({ storeName: store.name, dayLabel, cashier: cashierId ? (cashiers.find((u) => u.id === cashierId)?.name ?? '') : 'Todos', cut, showProfit }));
+    }
   };
 
   return (
@@ -76,24 +93,49 @@ export function CashPage() {
       />
 
       <div className={styles.filters}>
-        <label className={styles.filter}>
-          <span>Día</span>
-          <Input type="date" value={day} max={toInputDate(new Date())} onChange={(e) => e.target.value && setDay(e.target.value)} />
-        </label>
-        <label className={styles.filter}>
-          <span>Del cajero</span>
-          <Select value={cashierId} onChange={(e) => setCashierId(e.target.value)}>
-            <option value="">Todos</option>
-            {cashiers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </Select>
-        </label>
+        <div className={styles.viewSwitch} role="radiogroup" aria-label="Ver corte">
+          <button type="button" role="radio" aria-checked={view === 'shift'} className={view === 'shift' ? styles.viewOn : ''} onClick={() => setView('shift')}>
+            Por turno
+          </button>
+          <button type="button" role="radio" aria-checked={view === 'day'} className={view === 'day' ? styles.viewOn : ''} onClick={() => setView('day')}>
+            Por día
+          </button>
+        </div>
+        {view === 'shift' ? (
+          <label className={`${styles.filter} ${styles.filterWide}`}>
+            <span>Turno</span>
+            <Select value={shift?.id ?? ''} onChange={(e) => setShiftId(e.target.value)} disabled={shifts.length === 0}>
+              {shifts.length === 0 && <option value="">Todavía no hay turnos</option>}
+              {shifts.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {shiftLabel(s)}
+                </option>
+              ))}
+            </Select>
+          </label>
+        ) : (
+          <>
+            <label className={styles.filter}>
+              <span>Día</span>
+              <Input type="date" value={day} max={toInputDate(new Date())} onChange={(e) => e.target.value && setDay(e.target.value)} />
+            </label>
+            <label className={styles.filter}>
+              <span>Del cajero</span>
+              <Select value={cashierId} onChange={(e) => setCashierId(e.target.value)}>
+                <option value="">Todos</option>
+                {cashiers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          </>
+        )}
       </div>
 
-      <h2 className={styles.dayTitle}>Corte del {dayLabel}</h2>
+      <h2 className={styles.dayTitle}>{title}</h2>
+      {view === 'shift' && <p className="muted">El turno va desde la primera venta del cajero hasta que cierra la caja con "Salir", aunque pase la medianoche.</p>}
       {cut && <CutView cut={cut} showProfit={showProfit} names={names} />}
 
       <h2 className={styles.dayTitle}>Cajas abiertas</h2>
@@ -155,6 +197,18 @@ function CutView({ cut, showProfit, names }: { cut: DailyCut; showProfit: boolea
             <span>Total</span>
             <span className="num">{formatMoney(cut.cashInDrawer)}</span>
           </div>
+          {cut.counted !== undefined &&
+            (cut.counted === null ? (
+              <p className="muted">Turno abierto: todavía no contó la caja.</p>
+            ) : (
+              <>
+                {line('Contó al cerrar', cut.counted)}
+                <div className={styles.line}>
+                  <span>Diferencia</span>
+                  <DifferenceBadge value={cut.counted - cut.cashInDrawer} />
+                </div>
+              </>
+            ))}
         </Card>
 
         <Card title="Pagos">
@@ -214,7 +268,7 @@ function CutView({ cut, showProfit, names }: { cut: DailyCut; showProfit: boolea
         </div>
         {showProfit && (
           <div>
-            <span className={styles.totalLabel}>Ganancia del día</span>
+            <span className={styles.totalLabel}>{cut.counted !== undefined ? "Ganancia del turno" : "Ganancia del día"}</span>
             <strong className={`num ${styles.totalValue}`}>{formatMoney(cut.profit)}</strong>
             <span className="muted">Venta − costo de lo vendido</span>
           </div>

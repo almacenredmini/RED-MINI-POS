@@ -57,3 +57,21 @@
   background: var(--accent);
   color: var(--accent-text);
 }
+
+.rename {
+  display: flex;
+  flex: 1 1 260px;
+  gap: 6px;
+  align-items: center;
+}
+
+.rename > :first-child {
+  flex: 1;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}

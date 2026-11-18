@@ -8,26 +8,32 @@ import { Field, Input, Select } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { centsToInput, formatMoney, parseMoney } from '@/services/money';
 import { computePayment, type PayMode, type PaymentDraft } from '@/services/payment';
-import type { Cents } from '@/types/domain';
+import type { Cents, DiscountMethod } from '@/types/domain';
 import styles from './Pos.module.css';
 
-/** Promo de efectivo que vale ahora: sólo se aplica si se paga todo en efectivo. */
+/** Descuento que vale ahora si se paga todo con una forma de pago (Productos → Descuentos). */
 export interface PromoOffer {
   label: string;
   discount: Cents;
-  /** Aviso cuando hay productos sin promo en la venta (ej. "Sin promo: Cigarrillos"). */
+  /** Aviso cuando hay productos sin descuento en la venta (ej. "Sin descuento: Cigarrillos"). */
   note?: string | null;
 }
 
+/** Descuento disponible para cada forma de pago (efectivo, tarjeta, transferencia). */
+export type PromoOffers = Partial<Record<DiscountMethod, PromoOffer>>;
+
 interface Props {
   total: Cents;
-  promo?: PromoOffer | null;
-  /** Puede quitar la promo en esta venta. */
+  promos?: PromoOffers;
+  /** Puede quitar el descuento en esta venta. */
   canRemovePromo?: boolean;
   onClose: () => void;
-  /** Debe resolver cuando la venta quedó guardada. `promo`: la que se aplicó, si se aplicó. */
+  /** Debe resolver cuando la venta quedó guardada. `promo`: el descuento que se aplicó, si se aplicó. */
   onConfirm: (payments: PaymentDraft[], print: boolean, promo: PromoOffer | null) => Promise<void>;
 }
+
+const DISCOUNT_MODE: Partial<Record<PayMode, DiscountMethod>> = { cash: 'cash', card: 'card', transfer: 'transfer' };
+const OFFER_TEXT: Record<DiscountMethod, string> = { cash: 'Pagando en efectivo', card: 'Pagando con tarjeta', transfer: 'Pagando con transferencia' };
 
 const MODES: Array<{ mode: PayMode; label: string; key: string }> = [
   { mode: 'cash', label: 'Efectivo', key: 'F3' },
@@ -37,11 +43,14 @@ const MODES: Array<{ mode: PayMode; label: string; key: string }> = [
   { mode: 'account', label: 'Cuenta', key: 'F8' },
 ];
 
-export function PaymentModal({ total: fullTotal, promo = null, canRemovePromo = false, onClose, onConfirm }: Props) {
+export function PaymentModal({ total: fullTotal, promos = {}, canRemovePromo = false, onClose, onConfirm }: Props) {
   const [mode, setMode] = useState<PayMode>('cash');
   const [promoRemoved, setPromoRemoved] = useState(false);
-  const offered = promo && promo.discount > 0 ? promo : null;
-  const applied = offered && mode === 'cash' && !promoRemoved ? offered : null;
+  const modeMethod = DISCOUNT_MODE[mode];
+  const offered = modeMethod && promos[modeMethod] && promos[modeMethod].discount > 0 ? promos[modeMethod] : null;
+  const applied = offered && !promoRemoved ? offered : null;
+  // Descuentos de otras formas de pago, para avisar ("Pagando en efectivo: $1.300").
+  const others = (Object.keys(promos) as DiscountMethod[]).filter((m) => m !== modeMethod && (promos[m]?.discount ?? 0) > 0);
   const total = fullTotal - (applied?.discount ?? 0);
   const [cashText, setCashText] = useState('');
   const [cardText, setCardText] = useState('');
@@ -104,7 +113,7 @@ export function PaymentModal({ total: fullTotal, promo = null, canRemovePromo = 
             {applied.note && <span className={styles.promoHint}>{applied.note}</span>}
             {canRemovePromo && (
               <Button size="sm" variant="ghost" onClick={() => setPromoRemoved(true)}>
-                Quitar promo
+                Quitar descuento
               </Button>
             )}
           </div>
@@ -113,20 +122,18 @@ export function PaymentModal({ total: fullTotal, promo = null, canRemovePromo = 
         )}
         {offered && !applied && (
           <p className={styles.promoHint}>
-            {promoRemoved ? (
-              <>
-                Promo quitada en esta venta.{' '}
-                <button type="button" className={styles.linkButton} onClick={() => setPromoRemoved(false)}>
-                  Volver a aplicarla
-                </button>
-              </>
-            ) : (
-              <>
-                Pagando todo en efectivo: {formatMoney(fullTotal - offered.discount)} ({offered.label})
-              </>
-            )}
+            Descuento quitado en esta venta.{' '}
+            <button type="button" className={styles.linkButton} onClick={() => setPromoRemoved(false)}>
+              Volver a aplicarlo
+            </button>
           </p>
         )}
+        {!applied &&
+          others.map((m) => (
+            <p key={m} className={styles.promoHint}>
+              {OFFER_TEXT[m]}: {formatMoney(fullTotal - promos[m]!.discount)} ({promos[m]!.label})
+            </p>
+          ))}
 
         <div className={styles.modes} role="radiogroup" aria-label="Forma de pago">
           {MODES.map((m) => (

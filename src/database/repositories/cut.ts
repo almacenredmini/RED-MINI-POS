@@ -1,11 +1,12 @@
 import { db } from '../db';
-import type { CashMovement, PaymentMethod, UUID } from '@/types/domain';
-import { salesReport, type SalesReport } from './reports';
+import type { CashMovement, CashSession, PaymentMethod, UUID } from '@/types/domain';
+import { salesReport, type ReportFilter, type SalesReport } from './reports';
 
 /**
- * Corte del día, como en Eleventa: lo vendido en una sucursal en un día (de todos los cajeros o de uno),
- * cómo se cobró, cuánto efectivo tiene que haber, los retiros, las ventas por categoría y la ganancia.
- * Sólo lee: las cajas se siguen cerrando con "Salir".
+ * Corte, como en Eleventa: lo vendido (en un día, o en un turno de un cajero), cómo se cobró, cuánto
+ * efectivo tiene que haber, los retiros, las ventas por categoría y la ganancia.
+ * Un turno es una caja: la abre la primera venta del cajero y la cierra él al tocar "Salir",
+ * así que un turno que pasa la medianoche queda entero. Sólo lee: las cajas se cierran con "Salir".
  */
 export interface DailyCut {
   /** Todo lo vendido, con productos comunes y descontando devoluciones. */
@@ -26,6 +27,8 @@ export interface DailyCut {
   profit: number;
   returns: SalesReport['returns'];
   voided: SalesReport['voided'];
+  /** Sólo en el corte por turno: lo que contó el cajero al cerrar (null = todavía abierta). */
+  counted?: number | null;
 }
 
 /** `day` en formato `AAAA-MM-DD`, hora local. */
@@ -36,14 +39,9 @@ export function dayRange(day: string): { from: string; to: string } {
   return { from: start.toISOString(), to: end.toISOString() };
 }
 
-export async function dailyCut(storeId: UUID, day: string, userId: UUID | null): Promise<DailyCut> {
-  const { from, to } = dayRange(day);
-  const report = await salesReport(storeId, from, to, userId);
-
-  const sessions = await db.cash_sessions.where('[store_id+opened_at]').between([storeId, ''], [storeId, to], true, false).primaryKeys();
-  const movements = (await db.cash_movements.where('cash_session_id').anyOf(sessions).toArray())
-    .filter((m) => m.occurred_at >= from && m.occurred_at < to && (userId === null || m.user_id === userId))
-    .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+async function buildCut(storeId: UUID, from: string, to: string, filter: ReportFilter, movements: CashMovement[], opening = 0): Promise<DailyCut> {
+  const { userId = null, sessionId = null } = filter;
+  const report = await salesReport(storeId, from, to, filter);
   const deposits = movements.filter((m) => m.type === 'deposit').reduce((s, m) => s + m.amount_cents, 0);
   const withdrawals = movements.filter((m) => m.type === 'withdrawal').reduce((s, m) => s + m.amount_cents, 0);
 
@@ -51,7 +49,7 @@ export async function dailyCut(storeId: UUID, day: string, userId: UUID | null):
   const tickets = await db.sales
     .where('[store_id+occurred_at]')
     .between([storeId, from], [storeId, to], true, false)
-    .filter((s) => s.status === 'completed' && (userId === null || s.user_id === userId))
+    .filter((s) => s.status === 'completed' && (userId === null || s.user_id === userId) && (sessionId === null || s.cash_session_id === sessionId))
     .count();
   const cashSales = report.byMethod.cash ?? 0;
   const byCategory = report.byCategory.map((r) => ({ label: r.label, total: r.total }));
@@ -65,11 +63,39 @@ export async function dailyCut(storeId: UUID, day: string, userId: UUID | null):
     cashSales,
     deposits,
     withdrawals,
-    cashInDrawer: cashSales + deposits - withdrawals,
-    movements,
+    cashInDrawer: opening + cashSales + deposits - withdrawals,
+    movements: [...movements].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)),
     byCategory,
     profit: report.total - report.cost,
     returns: report.returns,
     voided: report.voided,
   };
+}
+
+/** Corte de un día calendario, de todos los cajeros o de uno. */
+export async function dailyCut(storeId: UUID, day: string, userId: UUID | null): Promise<DailyCut> {
+  const { from, to } = dayRange(day);
+  const sessions = await db.cash_sessions.where('[store_id+opened_at]').between([storeId, ''], [storeId, to], true, false).primaryKeys();
+  const movements = (await db.cash_movements.where('cash_session_id').anyOf(sessions).toArray()).filter(
+    (m) => m.occurred_at >= from && m.occurred_at < to && (userId === null || m.user_id === userId),
+  );
+  return buildCut(storeId, from, to, { userId }, movements);
+}
+
+/** Corte de un turno (una caja), desde que se abrió hasta que se cerró, aunque pase la medianoche. */
+export async function shiftCut(sessionId: UUID): Promise<DailyCut | null> {
+  const session = await db.cash_sessions.get(sessionId);
+  if (!session) return null;
+  // Hasta el cierre; si sigue abierta, hasta ahora (con margen por relojes desparejos entre dispositivos).
+  const to = session.closed_at ? new Date(new Date(session.closed_at).getTime() + 1000).toISOString() : '9999-12-31T00:00:00.000Z';
+  const movements = await db.cash_movements.where('cash_session_id').equals(sessionId).toArray();
+  const cut = await buildCut(session.store_id, session.opened_at, to, { sessionId }, movements, session.opening_cents);
+  return { ...cut, counted: session.counted_cents };
+}
+
+/** Turnos de la sucursal para elegir en Corte: los de los últimos `days` días, del más nuevo al más viejo. */
+export async function recentShifts(storeId: UUID, days = 31): Promise<CashSession[]> {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const rows = await db.cash_sessions.where('[store_id+opened_at]').between([storeId, since], [storeId, '￿'], true, true).toArray();
+  return rows.sort((a, b) => b.opened_at.localeCompare(a.opened_at));
 }
