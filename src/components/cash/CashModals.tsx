@@ -159,7 +159,7 @@ export function CloseCashModal({
   onClosed: () => void;
   onCancel: () => void;
   exitAfter?: boolean;
-  /** Sale sin cerrar la caja para un ingreso administrativo: después sólo entran el dueño, los encargados o el mismo cajero. */
+  /** Sale sin cerrar la caja (como "Dejar turno abierto" de Eleventa): después sólo entran el dueño, los encargados o el mismo cajero. */
   onHandOver?: () => void;
 }) {
   const { user, can } = useAuth();
@@ -274,7 +274,8 @@ export function CloseCashModal({
       </form>
       {onHandOver && (
         <div className={styles.handOver}>
-          <Button onClick={onHandOver}>Ingreso administrativo</Button>
+          <Button onClick={onHandOver}>Dejar turno abierto y salir</Button>
+          <p className="muted">Sólo vos, un administrador o un encargado van a poder entrar. Lo que se venda mientras tanto suma a tu caja.</p>
         </div>
       )}
     </Modal>

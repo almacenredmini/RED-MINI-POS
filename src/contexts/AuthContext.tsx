@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return `La caja de ${holder ?? 'otro usuario'} está abierta en este dispositivo. Tiene que entrar y tocar "Salir" para cerrarla, o que entre un administrador o encargado.`;
     }
     writeSession(found.id);
-    // Quien entra (también después de "Cambiar usuario") empieza en Vender.
+    // Quien entra empieza en Vender.
     window.location.hash = START_ROUTE;
     setUserId(found.id);
     setUser(found);

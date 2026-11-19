@@ -88,8 +88,11 @@ export async function shiftCut(sessionId: UUID): Promise<DailyCut | null> {
   if (!session) return null;
   // Hasta el cierre; si sigue abierta, hasta ahora (con margen por relojes desparejos entre dispositivos).
   const to = session.closed_at ? new Date(new Date(session.closed_at).getTime() + 1000).toISOString() : '9999-12-31T00:00:00.000Z';
+  // Desde un rato antes de la apertura: la primera venta es la que abre la caja y queda con una hora unos
+  // milisegundos anterior a `opened_at`. Igual sólo cuenta lo de esta caja (filtro por `sessionId`).
+  const from = new Date(new Date(session.opened_at).getTime() - 3_600_000).toISOString();
   const movements = await db.cash_movements.where('cash_session_id').equals(sessionId).toArray();
-  const cut = await buildCut(session.store_id, session.opened_at, to, { sessionId }, movements, session.opening_cents);
+  const cut = await buildCut(session.store_id, from, to, { sessionId }, movements, session.opening_cents);
   return { ...cut, counted: session.counted_cents };
 }
 

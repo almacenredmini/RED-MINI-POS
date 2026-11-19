@@ -7,41 +7,34 @@ import type { CashSession } from '@/types/domain';
 import { Button } from '@/components/ui/Button';
 
 /**
- * "Salir" cierra la caja de quien la abrió (con conteo a ciegas) y recién ahí cierra la sesión.
- * Quien tiene `cash.manage` puede además "Cambiar usuario": sale sin cerrar la caja, que sigue abierta
- * para el cajero (y lo que venda mientras tanto entra en esa caja).
+ * Un solo botón "Salir".
+ * - Si la caja abierta es de quien sale: cierra su turno (conteo a ciegas) o lo deja abierto y sale.
+ * - Si la caja es de otro (entró un administrador o encargado): sale sin tocarla.
+ * Con una caja abierta, lo que se venda en el dispositivo entra en esa caja, la venda quien la venda,
+ * y sólo pueden entrar su cajero, el dueño o un encargado (ver `login`).
  */
 export function ExitButton({ variant = 'ghost' }: { variant?: 'ghost' | 'secondary' }) {
-  const { user, can, logout } = useAuth();
+  const { user, logout } = useAuth();
   const open = useLiveQuery(() => getOpenSession(), []);
   // Se guarda la caja que se cierra: al cerrarse deja de ser "la abierta" y el resultado tiene que seguir a la vista.
   const [closing, setClosing] = useState<CashSession | null>(null);
   if (!user) return null;
 
   const mine = open !== undefined && open.opened_by === user.id;
-  const canSwitch = open !== undefined && can('cash.manage');
 
   return (
     <>
-      {canSwitch && (
-        <Button size="sm" variant={variant} onClick={logout} title="Sale sin cerrar la caja">
-          Cambiar<span className="hide-narrow"> usuario</span>
-        </Button>
-      )}
-      {(!open || mine || !canSwitch) && (
-        <Button size="sm" variant={variant} onClick={() => (mine ? setClosing(open) : logout())}>
-          Salir
-        </Button>
-      )}
+      <Button size="sm" variant={variant} onClick={() => (mine ? setClosing(open) : logout())}>
+        Salir
+      </Button>
       {closing && (
         <CloseCashModal
           session={closing}
           exitAfter
-          // El cajero no puede "Cambiar usuario", pero sí dar paso a un ingreso administrativo sin cerrar su caja.
-          {...(canSwitch ? {} : { onHandOver: () => {
+          onHandOver={() => {
             setClosing(null);
             logout();
-          } })}
+          }}
           onCancel={() => setClosing(null)}
           onClosed={() => {
             setClosing(null);

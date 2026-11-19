@@ -86,4 +86,19 @@ describe('corte por turno', () => {
     expect((await dailyCut(store.id, '2026-11-18', null)).salesTotal).toBe(700);
     expect((await recentShifts(store.id, 100000)).map((s) => s.id)).toEqual([s3.sale.cash_session_id, shift]);
   });
+
+  it('cuenta la primera venta, que abre la caja y queda con hora apenas anterior a la apertura', async () => {
+    const p = await saveProduct(base);
+    const first = await sell(cartFor(p.id, 'Fernet', 5500, 3000), 'cami');
+    await sell(cartFor(p.id, 'Fernet', 1000, 600), 'cami');
+    const shift = first.sale.cash_session_id!;
+    // Como pasa en la caja real: la venta toma la hora unos milisegundos antes de que se abra la caja.
+    const opened = (await db.cash_sessions.get(shift))!.opened_at;
+    await db.sales.update(first.sale.id, { occurred_at: new Date(new Date(opened).getTime() - 3).toISOString() });
+    await db.payments.where('sale_id').equals(first.sale.id).modify({ occurred_at: new Date(new Date(opened).getTime() - 3).toISOString() });
+    await closeSession(shift, 6500, 'cami');
+
+    const cut = (await shiftCut(shift))!;
+    expect([cut.salesTotal, cut.tickets, cut.cashSales, cut.cashInDrawer, cut.counted]).toEqual([6500, 2, 6500, 6500, 6500]);
+  });
 });
