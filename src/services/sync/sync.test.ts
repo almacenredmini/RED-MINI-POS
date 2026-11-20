@@ -409,6 +409,37 @@ describe('alcance por sucursal', () => {
   });
 });
 
+describe('mail del corte', () => {
+  it('con la clave guardada, el corte que llega sale por mail a Resend', async () => {
+    // Imitación de lo que Supabase ya trae: el Vault con los secretos y pg_net, que acá guarda el pedido.
+    await pg.exec(`
+      create schema vault;
+      create table vault.decrypted_secrets (name text, decrypted_secret text);
+      insert into vault.decrypted_secrets values ('resend_api_key', 're_prueba'), ('corte_mail_to', 'dueno@redmini.test');
+      create schema net;
+      create table net.calls (id bigserial, url text, headers jsonb, body jsonb);
+      create function net.http_post(url text, body jsonb, headers jsonb, timeout_milliseconds int) returns bigint language sql as
+        'insert into net.calls (url, headers, body) values (url, headers, body) returning id';
+    `);
+    const p = await saveProduct(base);
+    await sell(p.id, 2, ORO);
+    await closeSession((await getOpenSession())!.id, 1000, null);
+    await sync();
+    expect(await queueByStatus('error')).toBe(0);
+
+    const calls = await pg.query<{ url: string; headers: Record<string, string>; body: Record<string, unknown> }>('select url, headers, body from net.calls');
+    expect(calls.rows).toHaveLength(1);
+    const call = calls.rows[0]!;
+    expect(call.url).toBe('https://api.resend.com/emails');
+    expect(call.headers.Authorization).toBe('Bearer re_prueba');
+    expect(call.body.to).toEqual(['dueno@redmini.test']);
+    expect(String(call.body.subject)).toContain('Corte del turno de');
+    expect(String(call.body.html)).toContain('Dinero en caja');
+    const sent = await pg.query<{ request_id: string | null }>('select request_id from shift_reports');
+    expect(sent.rows[0]?.request_id).not.toBeNull();
+  });
+});
+
 describe('otras operaciones', () => {
   it('la caja, sus retiros y el cierre llegan al servidor y a los demás dispositivos', async () => {
     const p = await saveProduct(base);
@@ -428,6 +459,11 @@ describe('otras operaciones', () => {
     expect(server.rows[1]?.closed_at).toBeNull();
     const linked = await pg.query<{ cash_session_id: string }>('select cash_session_id from sales where id = $1', [sale.id]);
     expect(linked.rows[0]?.cash_session_id).toBe(server.rows[1]?.id);
+    // El corte del turno cerrado llega para el mail (acá no hay clave de Resend: no se manda, pero no traba nada).
+    const mail = await pg.query<{ subject: string; request_id: string | null }>('select subject, request_id from shift_reports where cash_session_id = $1', [first.id]);
+    expect(mail.rows).toHaveLength(1);
+    expect(mail.rows[0]?.subject).toContain('Corte del turno de');
+    expect(mail.rows[0]?.request_id).toBeNull();
 
     await newDevice();
     await sync(ORO.id);

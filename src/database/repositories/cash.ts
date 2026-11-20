@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { getDeviceId, peekDeviceId } from '../meta';
 import { enqueue } from '../outbox';
+import { queueShiftReport } from './cut';
 import { nowISO, uuidv7 } from '@/services/id';
 import type { CashMovement, CashSession, Payment } from '@/types/domain';
 
@@ -142,7 +143,7 @@ export interface CloseResult {
 export async function closeSession(sessionId: string, counted: number, userId: string | null, notes: string | null = null): Promise<CloseResult> {
   if (!Number.isInteger(counted) || counted < 0) throw new Error('Ingresá el efectivo contado');
   const deviceId = await getDeviceId();
-  return db.transaction('rw', [db.cash_sessions, db.cash_movements, db.sales, db.payments, db.sale_returns, db.sync_queue], async () => {
+  const result = await db.transaction('rw', [db.cash_sessions, db.cash_movements, db.sales, db.payments, db.sale_returns, db.sync_queue], async () => {
     const summary = await cashSummary(sessionId);
     if (!summary) throw new Error('La caja no existe');
     if (summary.session.closed_at) throw new Error('La caja ya está cerrada');
@@ -162,6 +163,13 @@ export async function closeSession(sessionId: string, counted: number, userId: s
     await enqueue('cash_sessions', closed.id, 'upsert', closed);
     return { expected: summary.expected, counted, difference: counted - summary.expected };
   });
+  // El mail del corte nunca puede trabar el cierre.
+  try {
+    await queueShiftReport(sessionId);
+  } catch (e) {
+    console.warn('No se pudo preparar el mail del corte', e);
+  }
+  return result;
 }
 
 /** Nota del cajero después de cerrar con diferencia (por qué cree que pasó). Vacía = sin nota. */

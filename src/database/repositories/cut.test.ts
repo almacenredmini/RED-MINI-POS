@@ -102,3 +102,24 @@ describe('corte por turno', () => {
     expect([cut.salesTotal, cut.tickets, cut.cashSales, cut.cashInDrawer, cut.counted]).toEqual([6500, 2, 6500, 6500, 6500]);
   });
 });
+
+describe('mail del corte', () => {
+  it('al cerrar la caja deja el corte del turno en la cola para mandarlo por mail', async () => {
+    await db.stores.add({ id: store.id, code: store.code, name: 'Oroño' } as never);
+    await db.users.add({ id: 'cami', name: 'CAMI <b>' } as never);
+    const p = await saveProduct(base);
+    const s = await sell(cartFor(p.id, 'Fernet', 5500, 3000), 'cami');
+    await sell(cartFor(p.id, 'Fernet', 2000, 1000), 'cami', 'card');
+    await closeSession(s.sale.cash_session_id!, 5000, 'cami');
+
+    const queued = await db.sync_queue.filter((q) => q.table === 'shift_reports').toArray();
+    expect(queued).toHaveLength(1);
+    const report = queued[0]!.payload as { cash_session_id: string; subject: string; html: string };
+    expect(report.cash_session_id).toBe(s.sale.cash_session_id);
+    expect(report.subject).toContain('Corte del turno de CAMI <b> · Oroño');
+    expect(report.subject).toContain('FALTAN $');
+    expect(report.html).toContain('CAMI &#60;b&#62;'); // el nombre va escapado en el HTML
+    expect(report.html).toContain('Faltan');
+    expect(report.html).toMatch(/Número de ventas.*?>2</s);
+  });
+});

@@ -305,7 +305,20 @@ export interface SyncQueueEntry {
   created_at: ISODate;
 }
 
-export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices' | 'screen_exits' | 'sale_returns' | 'task_templates' | 'day_tasks' | 'task_assignments' | 'cash_promos' | 'product_promos';
+export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices' | 'screen_exits' | 'sale_returns' | 'task_templates' | 'day_tasks' | 'task_assignments' | 'cash_promos' | 'product_promos' | 'shift_reports';
+
+/**
+ * Resumen de un turno cerrado, listo para mandar por mail. Sólo se sube (no se baja a los dispositivos):
+ * en Supabase, al llegar, sale el mail (ver migración 0024).
+ */
+export interface ShiftReport {
+  id: UUID;
+  store_id: UUID;
+  cash_session_id: UUID;
+  subject: string;
+  html: string;
+  created_at: ISODate;
+}
 
 export type UserRole = 'owner' | 'manager' | 'employee';
 

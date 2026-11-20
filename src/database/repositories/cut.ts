@@ -1,5 +1,8 @@
 import { db } from '../db';
-import type { CashMovement, CashSession, PaymentMethod, UUID } from '@/types/domain';
+import { enqueue } from '../outbox';
+import { cutEmailSubject, renderCutEmail } from '@/services/cutEmail';
+import { nowISO, uuidv7 } from '@/services/id';
+import type { CashMovement, CashSession, PaymentMethod, ShiftReport, UUID } from '@/types/domain';
 import { salesReport, type ReportFilter, type SalesReport } from './reports';
 
 /**
@@ -101,4 +104,27 @@ export async function recentShifts(storeId: UUID, days = 31): Promise<CashSessio
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
   const rows = await db.cash_sessions.where('[store_id+opened_at]').between([storeId, since], [storeId, '￿'], true, true).toArray();
   return rows.sort((a, b) => b.opened_at.localeCompare(a.opened_at));
+}
+
+/**
+ * Deja en la cola de sincronización el mail del corte de un turno cerrado. Cuando llega a Supabase sale
+ * el mail (si está configurado, ver migración 0024). Sin Internet espera en la cola como cualquier cambio.
+ */
+export async function queueShiftReport(sessionId: UUID): Promise<ShiftReport | null> {
+  const session = await db.cash_sessions.get(sessionId);
+  if (!session?.closed_at) return null;
+  const cut = await shiftCut(sessionId);
+  if (!cut) return null;
+  const [store, owner] = await Promise.all([db.stores.get(session.store_id), session.opened_by ? db.users.get(session.opened_by) : undefined]);
+  const info = { storeName: store?.name ?? 'sin nombre', cashier: owner?.name ?? 'Sin usuario', openedAt: session.opened_at, closedAt: session.closed_at, cut };
+  const report: ShiftReport = {
+    id: uuidv7(),
+    store_id: session.store_id,
+    cash_session_id: session.id,
+    subject: cutEmailSubject(info),
+    html: renderCutEmail(info),
+    created_at: nowISO(),
+  };
+  await db.transaction('rw', db.sync_queue, () => enqueue('shift_reports', report.id, 'upsert', report));
+  return report;
 }
