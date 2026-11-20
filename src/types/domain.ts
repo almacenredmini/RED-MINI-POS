@@ -235,6 +235,20 @@ export interface ProductPromo extends SyncMeta {
   valid_until: string;
 }
 
+/** Mercadería a descargar: una carga de stock hecha desde Escanear, con su casilla de "ya la bajé". */
+export interface UnloadItem extends SyncMeta {
+  id: UUID;
+  store_id: UUID;
+  product_id: UUID;
+  /** Nombre al momento de cargar: la lista se lee aunque después cambien el producto. */
+  product_name: string;
+  quantity: number;
+  movement_id: UUID | null;
+  loaded_by: UUID | null;
+  checked_at: ISODate | null;
+  checked_by: UUID | null;
+}
+
 export type ProductChangeAction = 'created' | 'updated' | 'deleted';
 /** De dónde vino el cambio. */
 export type ProductChangeSource = 'manual' | 'import' | 'purchase' | 'bulk_price';
@@ -305,7 +319,7 @@ export interface SyncQueueEntry {
   created_at: ISODate;
 }
 
-export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices' | 'screen_exits' | 'sale_returns' | 'task_templates' | 'day_tasks' | 'task_assignments' | 'cash_promos' | 'product_promos' | 'shift_reports';
+export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices' | 'screen_exits' | 'sale_returns' | 'task_templates' | 'day_tasks' | 'task_assignments' | 'cash_promos' | 'product_promos' | 'shift_reports' | 'unload_items';
 
 /**
  * Resumen de un turno cerrado, listo para mandar por mail. Sólo se sube (no se baja a los dispositivos):

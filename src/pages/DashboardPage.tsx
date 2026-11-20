@@ -48,7 +48,7 @@ export function DashboardPage() {
       <div className={styles.stats}>
         <StatCard label="Ventas del día" value={formatMoney(day.total)} icon="pos" highlight foot="Sin anuladas" />
         <StatCard label="Tickets" value={day.tickets} icon="reports" foot="De hoy" />
-        <StatCard label="Efectivo" value={formatMoney(day.cash)} icon="store" foot={`Tarjeta ${formatMoney(day.card)} · Transf. ${formatMoney(day.transfer)} · Cuentas ${formatMoney(day.account)}`} />
+        <StatCard label="Efectivo" value={formatMoney(day.cash)} icon="store" foot={`Tarjeta/QR ${formatMoney(day.card)} · Transf. ${formatMoney(day.transfer)} · Cuentas ${formatMoney(day.account)}`} />
         <StatCard label="Productos" value={productCount} icon="products" foot="En catálogo" />
       </div>
 

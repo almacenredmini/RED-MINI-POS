@@ -42,7 +42,7 @@ async function putUnique(table: Table, row: Row, field: string, pending: Set<str
 
 const UNIQUE_FIELD: Partial<Record<SyncTable, string>> = { barcodes: 'code', users: 'username', stores: 'code', sales: 'number' };
 
-export const MUTABLE: SyncTable[] = ['stores', 'users', 'categories', 'products', 'barcodes', 'suppliers', 'purchases', 'employee_accounts', 'sales', 'cash_sessions', 'staff_schedules', 'supplier_invoices', 'task_templates', 'day_tasks', 'task_assignments', 'cash_promos', 'product_promos'];
+export const MUTABLE: SyncTable[] = ['stores', 'users', 'categories', 'products', 'barcodes', 'suppliers', 'purchases', 'employee_accounts', 'sales', 'cash_sessions', 'staff_schedules', 'supplier_invoices', 'task_templates', 'day_tasks', 'task_assignments', 'cash_promos', 'product_promos', 'unload_items'];
 export const IMMUTABLE: SyncTable[] = ['sale_items', 'payments', 'product_cost_history', 'account_movements', 'purchase_items', 'cash_movements', 'product_changes', 'screen_exits', 'sale_returns'];
 
 /**

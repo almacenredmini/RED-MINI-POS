@@ -1,5 +1,7 @@
 import { listPromos, savePromo } from '@/database/repositories/cashPromos';
 import { listProductPromos, saveProductPromo } from '@/database/repositories/productPromos';
+import { addUnloadItem, clearUnloaded, listUnloadItems, setUnloadChecked } from '@/database/repositories/unloadItems';
+import { listInvoices, saveInvoice } from '@/database/repositories/supplierInvoices';
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -406,6 +408,29 @@ describe('alcance por sucursal', () => {
     expect(await localStock(ORO.id, p.id)).toBe(9);
     expect(await localStock(URI.id, p.id)).toBe(18);
     expect(await db.sales.count()).toBe(2);
+  });
+
+  it('la mercadería a descargar y las boletas se ven en la PC de cualquier local, con sus tildes', async () => {
+    const p = await saveProduct(base);
+    const item = await addUnloadItem({ storeId: URI.id, productId: p.id, productName: 'Fernet', quantity: 6, userId: null });
+    await addUnloadItem({ storeId: ORO.id, productId: p.id, productName: 'Fernet', quantity: 12, userId: null });
+    await saveInvoice({ store_id: URI.id, supplier_id: null, supplier_name: 'Distribuidora', issued_on: null, number: null, total_cents: null, items: [{ name: 'Fernet', quantity: 6, unit_cents: 1000 }], user_id: null });
+    await sync();
+
+    // La PC de Oroño sólo sincroniza su sucursal, pero igual ve lo de Uriburu.
+    await newDevice();
+    await sync(ORO.id);
+    expect((await listUnloadItems()).map((i) => [i.store_id, i.quantity]).sort()).toEqual([[ORO.id, 12], [URI.id, 6]].sort());
+    expect((await listInvoices(null)).map((i) => i.store_id)).toEqual([URI.id]);
+    await setUnloadChecked(item.id, true, null);
+    await sync(ORO.id);
+
+    await newDevice();
+    await sync(URI.id);
+    expect((await db.unload_items.get(item.id))?.checked_at).not.toBeNull();
+    expect(await clearUnloaded(URI.id)).toBe(1);
+    await sync(URI.id);
+    expect((await listUnloadItems()).map((i) => i.store_id)).toEqual([ORO.id]);
   });
 });
 

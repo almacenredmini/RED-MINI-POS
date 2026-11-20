@@ -9,7 +9,7 @@ import type { CashPromo, Cents, DiscountMethod } from '@/types/domain';
 
 export const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] as const;
 
-export const METHOD_NAMES: Record<DiscountMethod, string> = { cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transferencia' };
+export const METHOD_NAMES: Record<DiscountMethod, string> = { cash: 'Efectivo', card: 'Tarjeta/QR', transfer: 'Transferencia' };
 export const ALL_METHODS: DiscountMethod[] = ['cash', 'card', 'transfer'];
 
 const minutes = (hhmm: string) => {
@@ -120,7 +120,7 @@ export function computeDiscount(
   const discount = base - roundDown(base - exactDiscount, round);
   if (discount <= 0) return null;
   const percents = [...new Set([...used].map((p) => p.percent))];
-  const label = `Descuento ${METHOD_NAMES[method].toLowerCase()}${percents.length === 1 ? ` ${pct(percents[0]!)}` : ''}`;
+  const label = `Descuento ${METHOD_NAMES[method].toLowerCase().replace("/qr", "/QR")}${percents.length === 1 ? ` ${pct(percents[0]!)}` : ''}`;
   return { discount, label, skippedCategories: [...new Set(skipped)] };
 }
 

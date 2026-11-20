@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentStore } from '@/contexts/DeviceContext';
@@ -7,6 +7,7 @@ import { db } from '@/database/db';
 import { InventoryError, registerManualMovement } from '@/database/repositories/inventory';
 import { stockKey } from '@/database/repositories/stores';
 import { findProductByBarcode } from '@/database/repositories/products';
+import { addUnloadItem } from '@/database/repositories/unloadItems';
 import { CameraScanner } from '@/scanner/CameraScanner';
 import { useKeyboardWedge } from '@/scanner/useKeyboardWedge';
 import { scanFeedback } from '@/scanner/feedback';
@@ -36,6 +37,9 @@ export function ScanPage() {
   const store = useCurrentStore();
   const { user, can } = useAuth();
   const toast = useToast();
+  // Código a la vista: si la cámara lo sigue viendo no se vuelve a cargar (borraría la cantidad escrita).
+  const shownRef = useRef<string | null>(null);
+  shownRef.current = result?.code ?? null;
   const productId = result?.product?.id;
   const current = useLiveQuery(async () => (productId ? ((await db.stock.get(stockKey(store.id, productId)))?.quantity ?? 0) : 0), [productId, store.id], 0);
 
@@ -44,6 +48,8 @@ export function ScanPage() {
     if (!result?.product || qty === null) return toast('Ingresá una cantidad válida', 'error');
     try {
       const total = await registerManualMovement({ kind: 'entry', storeId: store.id, product: result.product, quantity: qty, reason: 'Carga desde Escanear', userId: user?.id ?? null });
+      // Queda en Mercadería a descargar; si eso falla, la carga de stock ya está hecha igual.
+      await addUnloadItem({ storeId: store.id, productId: result.product.id, productName: result.product.name, quantity: qty, userId: user?.id ?? null }).catch(console.error);
       toast(`${result.product.name}: stock en ${store.name} ${total}`, 'success');
       setQuantity('');
       setConfirming(false);
@@ -59,7 +65,9 @@ export function ScanPage() {
     else setConfirming(true);
   };
 
+  // Escanear otro código reemplaza el resultado, sin tener que tocar "Escanear otro".
   const onCode = async (code: string) => {
+    if (code === shownRef.current) return;
     const product = (await findProductByBarcode(code)) ?? null;
     if (!product) scanFeedback(false);
     setQuantity('');
@@ -71,9 +79,19 @@ export function ScanPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="Escanear" subtitle="Apuntá la cámara al código de barras" />
+      <PageHeader
+        title="Escanear"
+        subtitle="Apuntá la cámara al código de barras"
+        actions={
+          can('stock.adjust') && (
+            <ButtonLink to="/inventario/descargar" icon="purchases">
+              Mercadería a descargar
+            </ButtonLink>
+          )
+        }
+      />
       <div className={styles.layout}>
-        <CameraScanner onDetected={(c) => void onCode(c)} paused={result !== null} />
+        <CameraScanner onDetected={(c) => void onCode(c)} paused={confirming || quantity !== '' || promoFor !== null} />
         <Input
           value={manual}
           onChange={(e) => setManual(e.target.value)}

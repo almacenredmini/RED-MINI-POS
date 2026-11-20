@@ -54,7 +54,7 @@ export function computePayment(mode: PayMode, total: Cents, cash: Cents | null, 
 
 export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   cash: 'Efectivo',
-  card: 'Tarjeta',
+  card: 'Tarjeta/QR',
   debit: 'Débito',
   credit: 'Crédito',
   transfer: 'Transferencia',

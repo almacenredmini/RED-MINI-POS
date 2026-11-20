@@ -65,7 +65,7 @@ describe('descuentos', () => {
     expect(computeDiscount(lines, cat, [old], 'cash', monday)?.discount).toBe(58000); // $4.880 → $4.392 → $4.300
     expect(computeDiscount(lines, cat, [old], 'card', monday)).toBeNull();
     const transfer = promo({ methods: ['transfer', 'card'] });
-    expect(computeDiscount(lines, cat, [transfer], 'card', monday)?.label).toBe('Descuento tarjeta 10%');
+    expect(computeDiscount(lines, cat, [transfer], 'card', monday)?.label).toBe('Descuento tarjeta/QR 10%');
     expect(computeDiscount(lines, cat, [transfer], 'cash', monday)).toBeNull();
   });
 

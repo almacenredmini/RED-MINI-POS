@@ -1,9 +1,10 @@
 import { Suspense, useEffect, useRef, useState, type MouseEvent } from 'react';
-import { NavLink, Outlet, useLocation, type NavLinkProps } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate, type NavLinkProps } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDevice } from '@/contexts/DeviceContext';
 import { useToast } from '@/contexts/ToastContext';
 import { recalcMinStockIfNewWeek } from '@/database/repositories/minStock';
+import { useHotkeys } from '@/hooks/useHotkeys';
 import { EmptyState } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Logo } from '@/components/ui/Logo';
@@ -25,6 +26,14 @@ export function AppShell() {
   const moreRef = useRef<HTMLDetailsElement>(null);
   const { pathname } = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const navigate = useNavigate();
+
+  // F1 lleva a Vender desde cualquier pantalla. En Vender no hace nada acá: con el cobro abierto es "Cerrar e imprimir".
+  useHotkeys({
+    F1: () => {
+      if (user && pathname !== '/vender' && can('sales.create')) navigate('/vender');
+    },
+  });
 
   // El menú "Más" del celular se cierra al cambiar de pantalla.
   useEffect(() => setSheetOpen(false), [pathname]);

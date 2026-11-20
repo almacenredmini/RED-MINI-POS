@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCurrentStore } from '@/contexts/DeviceContext';
 import { listPurchases } from '@/database/repositories/purchases';
+import { listStores } from '@/database/repositories/stores';
 import { listSuppliers } from '@/database/repositories/suppliers';
 import { listInvoices } from '@/database/repositories/supplierInvoices';
 import { SupplierModal } from '@/components/purchases/SupplierModal';
@@ -27,7 +28,10 @@ export function PurchasesPage() {
   const [params, setParams] = useSearchParams();
   const tab: Tab = params.get('tab') === 'boletas' ? 'invoices' : params.get('tab') === 'proveedores' ? 'suppliers' : 'purchases';
   const setTab = (t: Tab) => setParams(t === 'purchases' ? {} : { tab: t === 'invoices' ? 'boletas' : 'proveedores' }, { replace: true });
-  const invoices = useLiveQuery(() => listInvoices(store.id), [store.id], []);
+  // Las boletas se comparten: se ven las de los dos locales, cada una con su sucursal.
+  const invoices = useLiveQuery(() => listInvoices(null), [], []);
+  const stores = useLiveQuery(listStores, [], []);
+  const storeName = new Map(stores.map((s) => [s.id, s.name]));
   // undefined = cerrado, null = proveedor nuevo.
   const [editing, setEditing] = useState<Supplier | null | undefined>(undefined);
   const purchases = useLiveQuery(() => listPurchases(store.id), [store.id], []);
@@ -76,6 +80,7 @@ export function PurchasesPage() {
                     <span className="muted num">
                       {inv.issued_on ? new Date(`${inv.issued_on}T12:00`).toLocaleDateString('es-AR') : 'Sin fecha'}
                       {inv.number ? ` · ${inv.number}` : ''} · {inv.items.length} artículos
+                      {stores.length > 1 && storeName.get(inv.store_id) ? ` · ${storeName.get(inv.store_id)}` : ''}
                     </span>
                   </span>
                   <span className={`${styles.rowEnd} num`}>

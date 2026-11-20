@@ -15,7 +15,7 @@ import { CompareModal } from '@/components/inventory/CompareModal';
 import { ProductChangesTab } from '@/components/inventory/ProductChanges';
 import { MovementModal, type MovementMode } from '@/components/inventory/MovementModal';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card, EmptyState, StatCard } from '@/components/ui/Card';
 import { Input, Select } from '@/components/ui/Field';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -193,6 +193,7 @@ export function InventoryPage() {
         subtitle={`Sucursal ${store.name}`}
         actions={
           <>
+            <ButtonLink to="/inventario/descargar" icon="purchases">Mercadería a descargar</ButtonLink>
             <Button icon="plus" onClick={() => setMode('entry')}>Entrada</Button>
             <Button icon="minus" onClick={() => setMode('exit')}>Salida</Button>
             <Button icon="check" onClick={() => setMode('count')}>Conteo</Button>

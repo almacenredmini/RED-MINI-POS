@@ -11,6 +11,7 @@ import { PosPage } from '@/pages/PosPage';
 const ProductsPage = lazy(() => import('@/pages/ProductsPage').then((m) => ({ default: m.ProductsPage })));
 const ProductEditPage = lazy(() => import('@/pages/ProductEditPage').then((m) => ({ default: m.ProductEditPage })));
 const ScanPage = lazy(() => import('@/pages/ScanPage').then((m) => ({ default: m.ScanPage })));
+const UnloadPage = lazy(() => import('@/pages/UnloadPage').then((m) => ({ default: m.UnloadPage })));
 const PromotionsPage = lazy(() => import('@/pages/PromotionsPage').then((m) => ({ default: m.PromotionsPage })));
 const DiscountsPage = lazy(() => import('@/pages/DiscountsPage').then((m) => ({ default: m.DiscountsPage })));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
@@ -49,6 +50,7 @@ export const router = createHashRouter([
       { path: 'vender', element: <RequirePermission permission="sales.create"><PosPage /></RequirePermission> },
       { path: 'horarios', element: <RequirePermission permission="schedules.manage"><SchedulesPage /></RequirePermission> },
       { path: 'cuentas', element: <RequirePermission permission="accounts.manage"><AccountsPage /></RequirePermission> },
+      { path: 'inventario/descargar', element: <RequirePermission permission="stock.adjust"><UnloadPage /></RequirePermission> },
       { path: 'inventario', element: <RequirePermission permission="stock.adjust"><InventoryPage /></RequirePermission> },
       { path: 'compras', element: <RequirePermission permission="purchases.manage"><PurchasesPage /></RequirePermission> },
       { path: 'compras/boletas/nueva', element: <RequirePermission permission="purchases.manage"><SupplierInvoicePage /></RequirePermission> },

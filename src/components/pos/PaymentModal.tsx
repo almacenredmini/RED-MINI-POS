@@ -33,11 +33,11 @@ interface Props {
 }
 
 const DISCOUNT_MODE: Partial<Record<PayMode, DiscountMethod>> = { cash: 'cash', card: 'card', transfer: 'transfer' };
-const OFFER_TEXT: Record<DiscountMethod, string> = { cash: 'Pagando en efectivo', card: 'Pagando con tarjeta', transfer: 'Pagando con transferencia' };
+const OFFER_TEXT: Record<DiscountMethod, string> = { cash: 'Pagando en efectivo', card: 'Pagando con tarjeta/QR', transfer: 'Pagando con transferencia' };
 
 const MODES: Array<{ mode: PayMode; label: string; key: string }> = [
   { mode: 'cash', label: 'Efectivo', key: 'F3' },
-  { mode: 'card', label: 'Tarjeta', key: 'F4' },
+  { mode: 'card', label: 'Tarjeta/QR', key: 'F4' },
   { mode: 'transfer', label: 'Transferencia', key: 'F7' },
   { mode: 'mixed', label: 'Mixto', key: 'F6' },
   { mode: 'account', label: 'Cuenta', key: 'F8' },
@@ -87,7 +87,22 @@ export function PaymentModal({ total: fullTotal, promos = {}, canRemovePromo = f
     setCardText('');
   };
 
+  // Flechitas: pasan a la forma de pago anterior o siguiente. En una lista desplegable (cuenta) siguen eligiendo ahí,
+  // y ← → con algo escrito en un campo siguen moviendo el cursor.
+  const stepMode = (delta: number, sideways: boolean) => (e: KeyboardEvent) => {
+    const t = e.target as HTMLElement | null;
+    if (t instanceof HTMLSelectElement) return false;
+    if (sideways && t instanceof HTMLInputElement && t.value !== '') return false;
+    const i = MODES.findIndex((m) => m.mode === mode);
+    const next = MODES[i + delta];
+    if (next) selectMode(next.mode);
+  };
+
   useHotkeys({
+    ArrowLeft: stepMode(-1, true),
+    ArrowRight: stepMode(1, true),
+    ArrowUp: stepMode(-1, false),
+    ArrowDown: stepMode(1, false),
     F1: () => void confirm(true),
     F2: () => void confirm(false),
     F3: () => selectMode('cash'),
@@ -150,7 +165,7 @@ export function PaymentModal({ total: fullTotal, promos = {}, canRemovePromo = f
           </Field>
         )}
 
-        {mode === 'card' && <p className="muted">Se cobra el total con tarjeta.</p>}
+        {mode === 'card' && <p className="muted">Se cobra el total con tarjeta o QR.</p>}
         {mode === 'transfer' && <p className="muted">Se cobra el total por transferencia.</p>}
 
         {mode === 'account' &&
@@ -191,7 +206,7 @@ export function PaymentModal({ total: fullTotal, promos = {}, canRemovePromo = f
                 />
               )}
             </Field>
-            <Field label="Tarjeta">
+            <Field label="Tarjeta/QR">
               {(id) => (
                 <Input
                   id={id}
