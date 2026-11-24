@@ -19,6 +19,7 @@ import {
   saveStoreShifts,
   scheduleMinutes,
   scheduleWhatsappText,
+  scheduleWhatsappTextByPerson,
   ScheduleError,
   SHIFT_NAMES,
   shiftMinutes,
@@ -248,7 +249,12 @@ export function SchedulesPage() {
       {shiftsOpen && <StoreShiftsModal initialStore={storeId || currentStore?.id || ''} onClose={() => setShiftsOpen(false)} />}
       {sharing && (
         <WhatsappModal
-          text={scheduleWhatsappText(
+          byPerson={scheduleWhatsappTextByPerson(
+            sharing,
+            schedules.filter((s) => s.store_id === sharing.id),
+            monday,
+          )}
+          byDay={scheduleWhatsappText(
             sharing,
             schedules.filter((s) => s.store_id === sharing.id),
             monday,
@@ -261,8 +267,27 @@ export function SchedulesPage() {
 }
 
 /** Vista previa del mensaje y envío: en el celular abre el menú de compartir (elegís el grupo); en la PC, WhatsApp Web. */
-function WhatsappModal({ text, onClose }: { text: string; onClose: () => void }) {
+const FORMAT_KEY = 'horarios.whatsapp';
+
+function WhatsappModal({ byPerson, byDay, onClose }: { byPerson: string; byDay: string; onClose: () => void }) {
   const toast = useToast();
+  // Se recuerda en este dispositivo cómo lo mandaste la última vez.
+  const [format, setFormat] = useState<'person' | 'day'>(() => {
+    try {
+      return localStorage.getItem(FORMAT_KEY) === 'day' ? 'day' : 'person';
+    } catch {
+      return 'person';
+    }
+  });
+  const pick = (f: 'person' | 'day') => {
+    setFormat(f);
+    try {
+      localStorage.setItem(FORMAT_KEY, f);
+    } catch {
+      /* Sin almacenamiento: sólo vale ahora. */
+    }
+  };
+  const text = format === 'person' ? byPerson : byDay;
   const send = async () => {
     if (navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
       try {
@@ -297,6 +322,14 @@ function WhatsappModal({ text, onClose }: { text: string; onClose: () => void })
         </>
       }
     >
+      <div className={styles.modes} role="radiogroup" aria-label="Cómo armar el mensaje">
+        <button type="button" role="radio" aria-checked={format === 'person'} className={format === 'person' ? styles.modeActive : styles.mode} onClick={() => pick('person')}>
+          Por cajero
+        </button>
+        <button type="button" role="radio" aria-checked={format === 'day'} className={format === 'day' ? styles.modeActive : styles.mode} onClick={() => pick('day')}>
+          Por día
+        </button>
+      </div>
       <p className="muted">Se abre WhatsApp con este mensaje: elegí el grupo y mandalo.</p>
       <pre className={styles.preview}>{text}</pre>
     </Modal>

@@ -97,7 +97,28 @@ const hourText = (t: string) => t.replace(/^0(\d)/, '$1').replace(/:00$/, '');
 const sameShift = (a: Shift | null | undefined, b: Shift) => !!a && a.start === b.start && a.end === b.end;
 const dayShort = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 
-/** Texto de la semana para mandar al grupo de WhatsApp (con *negritas* de WhatsApp). */
+/**
+ * Texto de la semana para WhatsApp, cajero por cajero: sus días con horario (o franco) y sus horas.
+ * Ej.: "*Alex* · ☀️ Mañana · 42 h" y debajo "Lunes 23/11: 8 a 15".
+ */
+export function scheduleWhatsappTextByPerson(store: Pick<Store, 'name'> & StoreHours, schedules: StaffSchedule[], monday: Date): string {
+  const lines = [`*Horarios RED MINI · ${store.name}*`, `Semana del lunes ${dayShort(monday)} al domingo ${dayShort(addDays(monday, 6))}`];
+  for (const s of schedules) {
+    const shift = s.rotation ? shiftOfWeek(s.rotation, monday) : null;
+    const hours = formatHours(scheduleMinutes(s, store, monday, addDays(monday, 6)));
+    lines.push('', `*${s.name}*${shift ? ` · ${shift === 'morning' ? '☀️ Mañana' : '🌙 Noche'}` : ''} · ${hours}`);
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(monday, i);
+      const special = storeDayOverride(store, date);
+      const shifts = shiftsOn(s, store, date);
+      const what = shifts.length ? shifts.map((sh) => `${hourText(sh.start)} a ${hourText(sh.end)}`).join(' y ') : special?.closed ? 'Cerrado' : 'Franco';
+      lines.push(`${WEEKDAYS[i]} ${dayShort(date)}${special?.label ? ` (${special.label})` : ''}: ${what}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+/** Texto de la semana para mandar al grupo de WhatsApp, día por día (con *negritas* de WhatsApp). */
 export function scheduleWhatsappText(store: Pick<Store, 'name'> & StoreHours, schedules: StaffSchedule[], monday: Date): string {
   const lines = [`*Horarios RED MINI · ${store.name}*`, `Semana del lunes ${dayShort(monday)} al domingo ${dayShort(addDays(monday, 6))}`];
   for (let i = 0; i < 7; i++) {

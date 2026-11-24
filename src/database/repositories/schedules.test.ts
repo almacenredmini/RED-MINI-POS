@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../db';
-import { addDays, dayKeyOf, deleteSchedule, emptyWeek, formatHours, listSchedules, minutesBetween, mondayOf, monthPeriods, saveSchedule, saveStoreShifts, ScheduleError, setScheduleOverride, setStoreOverride, shiftsOn, scheduleMinutes, scheduleWhatsappText, shiftMinutes, shiftOfWeek, weekMinutes, weekOf } from './schedules';
+import { addDays, dayKeyOf, deleteSchedule, emptyWeek, formatHours, listSchedules, minutesBetween, mondayOf, monthPeriods, saveSchedule, saveStoreShifts, ScheduleError, setScheduleOverride, setStoreOverride, shiftsOn, scheduleMinutes, scheduleWhatsappText, scheduleWhatsappTextByPerson, shiftMinutes, shiftOfWeek, weekMinutes, weekOf } from './schedules';
 
 beforeEach(async () => {
   await db.delete();
@@ -123,6 +123,11 @@ describe('feriados y cambios de un día', () => {
     expect(text).toContain('*Lunes 23/11 · Feriado*\n☀️ Mañana (9 a 13): Cami\nFranco: Juan');
     expect(text).toContain('*Martes 24/11 · Feriado*\nCerrado');
     expect(text).toContain('*Jueves 26/11*\n☀️ Mañana (8 a 15): Cami\n🕒 17 a 22: Juan');
+
+    const perPerson = scheduleWhatsappTextByPerson(store, [c, j], monday);
+    expect(perPerson).toContain('*Cami* · ☀️ Mañana · 25 h\nLunes 23/11 (Feriado): 9 a 13\nMartes 24/11 (Feriado): Cerrado\nMiércoles 25/11: Franco\nJueves 26/11: 8 a 15');
+    expect(perPerson).toContain('*Juan* · 🌙 Noche');
+    expect(perPerson).toContain('Jueves 26/11: 17 a 22');
 
     // Volver a lo de siempre.
     await setScheduleOverride(cami.id, '2026-11-25', null);
