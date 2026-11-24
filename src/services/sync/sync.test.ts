@@ -2,6 +2,7 @@ import { listPromos, savePromo } from '@/database/repositories/cashPromos';
 import { listProductPromos, saveProductPromo } from '@/database/repositories/productPromos';
 import { addUnloadItem, clearUnloaded, listUnloadItems, setUnloadChecked } from '@/database/repositories/unloadItems';
 import { listInvoices, saveInvoice } from '@/database/repositories/supplierInvoices';
+import { emptyWeek, listSchedules, saveSchedule, saveStoreShifts, shiftOfWeek, weekOf } from '@/database/repositories/schedules';
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -431,6 +432,21 @@ describe('alcance por sucursal', () => {
     expect(await clearUnloaded(URI.id)).toBe(1);
     await sync(URI.id);
     expect((await listUnloadItems()).map((i) => i.store_id)).toEqual([ORO.id]);
+  });
+
+  it('los turnos del local y la rotación de cada persona llegan a la PC del otro local', async () => {
+    const day = { morning: { start: '08:00', end: '15:00' }, night: { start: '15:00', end: '22:00' } };
+    await saveStoreShifts(URI.id, Array.from({ length: 7 }, () => day));
+    await saveSchedule({ store_id: URI.id, user_id: null, name: 'Cami', pay_period: 'weekly', days: emptyWeek(), notes: null, rotation: { work_days: [0, 1, 2], shift: 'night', week: '2026-11-23', rotates: true } });
+    await sync();
+
+    await newDevice();
+    await sync(ORO.id);
+    const [cami] = await listSchedules(null);
+    const store = await db.stores.get(URI.id);
+    expect(cami?.name).toBe('Cami');
+    expect(shiftOfWeek(cami!.rotation!, new Date(2026, 10, 30))).toBe('morning');
+    expect(weekOf(cami!, store, new Date(2026, 10, 23))[0]).toEqual([{ start: '15:00', end: '22:00' }]);
   });
 });
 

@@ -148,3 +148,139 @@
     min-width: 0;
   }
 }
+
+.week {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.preview {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  max-height: 50vh;
+  overflow: auto;
+  margin: 8px 0 0;
+}
+
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mode,
+.modeActive {
+  padding: 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modeActive {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.workDays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 6px 0 10px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.rotates {
+  align-self: end;
+  padding-bottom: 10px;
+}
+
+.storeDay {
+  display: grid;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.storeShift {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.times {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 420px) {
+  .storeShift {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dayHead {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+}
+
+.dayHead:hover,
+.dayHead:focus-visible {
+  color: var(--accent);
+}
+
+.special {
+  color: var(--accent);
+  font-size: 0.7rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.changed {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.day {
+  cursor: pointer;
+}
+
+.day:hover {
+  outline: 1px solid var(--accent);
+  outline-offset: -3px;
+}

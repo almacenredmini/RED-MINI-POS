@@ -29,6 +29,24 @@ export interface Store extends SyncMeta {
   name: string;
   address: string | null;
   active: boolean;
+  /** Horario de los turnos mañana y noche, de lunes (0) a domingo (6). null = ese día no hay ese turno. */
+  shift_hours?: StoreShiftDay[] | null;
+  /** Días especiales (feriados): por fecha `AAAA-MM-DD`, reemplazan el horario de ese día. */
+  shift_overrides?: Record<string, StoreDayOverride> | null;
+}
+
+/** Un día especial del local: otro horario de turnos, o cerrado. */
+export interface StoreDayOverride extends StoreShiftDay {
+  closed: boolean;
+  /** Ej.: "Feriado". */
+  label: string | null;
+}
+
+export type ShiftName = 'morning' | 'night';
+
+export interface StoreShiftDay {
+  morning: Shift | null;
+  night: Shift | null;
 }
 
 export interface Category extends SyncMeta {
@@ -86,6 +104,21 @@ export interface StaffSchedule extends SyncMeta {
   /** De lunes (0) a domingo (6). */
   days: Shift[][];
   notes: string | null;
+  /** Si tiene, el horario sale de los turnos del local (y `days` es sólo una copia de la semana base). */
+  rotation?: Rotation | null;
+  /** Cambios puntuales por fecha `AAAA-MM-DD`: ese día trabaja estos turnos ([] = franco). */
+  overrides?: Record<string, Shift[]> | null;
+}
+
+/** Turno mañana o noche del local, los días que trabaja; si `rotates`, cambia de turno cada semana. */
+export interface Rotation {
+  /** Lunes (0) a domingo (6). */
+  work_days: number[];
+  /** El turno que hace la semana `week`. */
+  shift: ShiftName;
+  /** Lunes de esa semana, `AAAA-MM-DD`. */
+  week: string;
+  rotates: boolean;
 }
 
 /** Un artículo de una boleta de proveedor, tal como figura impreso. No se vincula con los productos. */
