@@ -93,19 +93,22 @@ export function SchedulesPage() {
         )}
         <div className={styles.week}>
           <Button size="sm" icon="back" aria-label="Semana anterior" onClick={() => setMonday(addDays(monday, -7))} />
-          <strong className="num">
+          <strong className={`num ${styles.weekLabel}`}>
             Semana del {ddmm(monday)} al {ddmm(addDays(monday, 6))}
           </strong>
           <Button size="sm" aria-label="Semana siguiente" onClick={() => setMonday(addDays(monday, 7))}>
             ›
           </Button>
           {!thisWeek && (
-            <Button size="sm" variant="ghost" onClick={() => setMonday(mondayOf(new Date()))}>
-              Esta semana
+            <Button size="sm" variant="ghost" className={styles.thisWeek} onClick={() => setMonday(mondayOf(new Date()))}>
+              Volver a esta semana
             </Button>
           )}
         </div>
-        <Input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} aria-label="Mes para las horas" />
+        <label className={styles.month}>
+          <span className="muted">Horas del mes</span>
+          <Input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
+        </label>
       </div>
 
       {schedules.length === 0 ? (

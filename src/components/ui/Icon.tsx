@@ -26,6 +26,7 @@ const PATHS = {
   lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
   calendar: 'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4',
   menu: 'M4 6h16M4 12h16M4 18h16',
+  truck: 'M1 5h14v11H1zM15 9h4l3 3v4h-7zM5.5 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18.5 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
   cash: 'M2 6h20v12H2zM12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6M6 12h.01M18 12h.01',
 } as const;
 

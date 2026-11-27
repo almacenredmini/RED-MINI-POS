@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { downloadCsv, pesos, toCsv } from '@/services/csv';
 import { BarChart, type Bar } from '@/components/reports/BarChart';
 import { SlowMoversCard } from '@/components/reports/SlowMovers';
+import { methodLabel, wholesaleReport, type WholesaleReport } from '@/database/repositories/wholesale';
 import { formatDuration, listScreenExits } from '@/database/repositories/screenExits';
 import { Card, StatCard } from '@/components/ui/Card';
 import { Input, Select } from '@/components/ui/Field';
@@ -100,6 +101,7 @@ export function ReportsPage() {
   const report = useLiveQuery(() => salesReport(scope, start.toISOString(), end.toISOString()), [scope, start.getTime(), end.getTime()]);
   const exits = useLiveQuery(() => listScreenExits(scope, start.toISOString(), end.toISOString()), [scope, start.getTime(), end.getTime()], []);
   const stock = useLiveQuery(() => (showCost ? stockValue(scope) : Promise.resolve([])), [scope, showCost], []);
+  const wholesale = useLiveQuery(() => wholesaleReport(scope, start.toISOString(), end.toISOString()), [scope, start.getTime(), end.getTime()]);
   const days = Math.round((end.getTime() - start.getTime()) / 86_400_000);
 
   return (
@@ -145,6 +147,8 @@ export function ReportsPage() {
       ) : (
         <Report report={report} start={start} days={days} showCost={showCost} allStores={!storeId} />
       )}
+
+      {wholesale && (wholesale.tickets > 0 || can('wholesale.manage')) && <WholesaleCard report={wholesale} showCost={showCost} />}
 
       <SlowMoversCard storeId={scope} className={styles.block} />
 
@@ -294,6 +298,52 @@ function Report({ report, start, days, showCost, allStores }: { report: SalesRep
         <RankCard title="Más vendidos" rows={report.byProduct} count="quantity" showCost={showCost} total={report.total} wide sortable limit={30} />
       </div>
     </>
+  );
+}
+
+/** Mayorista: ventas extraordinarias, aparte. No están sumadas en Ventas ni en ninguna tabla de arriba. */
+function WholesaleCard({ report, showCost }: { report: WholesaleReport; showCost: boolean }) {
+  const profit = report.total - report.cost;
+  return (
+    <Card title={`Ventas extraordinarias · Mayorista (${report.tickets})`} className={styles.block}>
+      {report.tickets === 0 ? (
+        <p className="muted">No hubo ventas mayoristas en este período.</p>
+      ) : (
+        <>
+          <div className={styles.stats}>
+            <StatCard label="Vendido" value={formatMoney(report.total)} icon="truck" foot={`${report.tickets} ${report.tickets === 1 ? 'ticket' : 'tickets'}`} />
+            {showCost && <StatCard label="Ganancia" value={formatMoney(profit)} icon="cash" foot={`Margen ${pct(profit, report.total)}`} />}
+            <StatCard label="Cobrado" value={formatMoney(report.paid)} icon="check" foot={report.byMethod.map((m) => `${methodLabel(m.method)} ${formatMoney(m.total)}`).join(' · ') || '—'} />
+            <StatCard label="Te deben" value={formatMoney(report.pending)} icon="alert" foot={report.pending > 0 ? 'De estos tickets' : 'Todo cobrado'} />
+          </div>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th className="num">Tickets</th>
+                  <th className="num">Vendido</th>
+                  {showCost && <th className="num">Ganancia</th>}
+                  <th className="num">Debe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.byCustomer.map((r) => (
+                  <tr key={r.key}>
+                    <td className={styles.name}>{r.label}</td>
+                    <td className="num">{r.tickets}</td>
+                    <td className="num">{formatMoney(r.total)}</td>
+                    {showCost && <td className="num">{formatMoney(r.total - r.cost)}</td>}
+                    <td className="num">{r.pending > 0 ? formatMoney(r.pending) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      <p className="muted">No se suman a las ventas de arriba, a la caja ni al stock.</p>
+    </Card>
   );
 }
 

@@ -1,0 +1,119 @@
+.filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 260px));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 600px) {
+  .filters {
+    grid-template-columns: 1fr;
+  }
+}
+
+.owed {
+  margin: 0 0 12px;
+  color: var(--warning);
+}
+
+.voided {
+  opacity: 0.55;
+}
+
+.voided strong {
+  text-decoration: line-through;
+}
+
+/* Celular: cantidad y total arriba; costo y venta abajo, con lugar para montos grandes. */
+.lineFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+}
+
+.lineFields > :first-child {
+  order: 1;
+}
+
+.lineTotal {
+  order: 2;
+  justify-self: end;
+  padding-bottom: 10px;
+  font-weight: 700;
+}
+
+.lineFields > :nth-child(2),
+.lineFields > :nth-child(3) {
+  order: 3;
+}
+
+@media (min-width: 640px) {
+  .lineFields {
+    grid-template-columns: 110px 170px 170px 1fr;
+  }
+
+  .lineFields > * {
+    order: 0 !important;
+  }
+}
+
+.below {
+  color: var(--warning);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.sums {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+}
+
+.sums > div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.customerRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.mode,
+.modeActive {
+  padding: 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modeActive {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pay {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.voidedNote {
+  color: var(--danger);
+  font-weight: 600;
+}

@@ -2,6 +2,7 @@ import { listPromos, savePromo } from '@/database/repositories/cashPromos';
 import { listProductPromos, saveProductPromo } from '@/database/repositories/productPromos';
 import { addUnloadItem, clearUnloaded, listUnloadItems, setUnloadChecked } from '@/database/repositories/unloadItems';
 import { listInvoices, saveInvoice } from '@/database/repositories/supplierInvoices';
+import { customerDebts, listWholesaleSales, saveCustomer, saveWholesaleSale, setWholesalePaid } from '@/database/repositories/wholesale';
 import { emptyWeek, listSchedules, saveSchedule, saveStoreShifts, shiftOfWeek, weekOf } from '@/database/repositories/schedules';
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
@@ -447,6 +448,28 @@ describe('alcance por sucursal', () => {
     expect(cami?.name).toBe('Cami');
     expect(shiftOfWeek(cami!.rotation!, new Date(2026, 10, 30))).toBe('morning');
     expect(weekOf(cami!, store, new Date(2026, 10, 23))[0]).toEqual([{ start: '15:00', end: '22:00' }]);
+  });
+});
+
+describe('mayorista', () => {
+  it('clientes y tickets mayoristas se comparten entre locales y no tocan stock ni ventas', async () => {
+    const pepe = await saveCustomer({ name: 'Kiosco Pepe' });
+    const sale = await saveWholesaleSale({ store: URI, customer: pepe, items: [{ product_id: null, name: 'Fernet', quantity: 24, cost_cents: 650000, price_cents: 800000 }], method: null, paid: false, userId: null });
+    await sync();
+    expect(await queueByStatus('error')).toBe(0);
+
+    await newDevice();
+    await sync(ORO.id);
+    expect((await listWholesaleSales()).map((s) => s.number)).toEqual([sale.number]);
+    expect((await customerDebts()).get(pepe.id)).toBe(24 * 800000);
+    expect(await db.sales.count()).toBe(0);
+    await setWholesalePaid(sale.id, true, 'transfer');
+    await sync(ORO.id);
+
+    await newDevice();
+    await sync(URI.id);
+    expect((await db.wholesale_sales.get(sale.id))?.method).toBe('transfer');
+    expect((await customerDebts()).size).toBe(0);
   });
 });
 

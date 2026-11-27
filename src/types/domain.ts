@@ -282,6 +282,51 @@ export interface UnloadItem extends SyncMeta {
   checked_by: UUID | null;
 }
 
+/** Cliente mayorista (se comparte entre sucursales). */
+export interface WholesaleCustomer extends SyncMeta {
+  id: UUID;
+  name: string;
+  phone: string | null;
+  tax_id: string | null;
+  address: string | null;
+  notes: string | null;
+}
+
+export type WholesaleMethod = 'cash' | 'card' | 'transfer';
+
+/** Renglón de un ticket mayorista: cantidad, costo y precio se cargan a mano para esa venta. */
+export interface WholesaleItem {
+  product_id: UUID | null;
+  name: string;
+  quantity: number;
+  cost_cents: Cents;
+  price_cents: Cents;
+}
+
+/**
+ * Venta mayorista: una venta extraordinaria. No toca el stock, la caja ni las ventas del local;
+ * en Reportes va aparte. Se ve desde cualquier sucursal.
+ */
+export interface WholesaleSale extends SyncMeta {
+  id: UUID;
+  store_id: UUID;
+  number: string;
+  customer_id: UUID | null;
+  /** Nombre al momento de la venta, para que el ticket se lea igual aunque después cambie el cliente. */
+  customer_name: string | null;
+  occurred_at: ISODate;
+  items: WholesaleItem[];
+  total_cents: Cents;
+  cost_cents: Cents;
+  method: WholesaleMethod | null;
+  /** null = el cliente lo debe. */
+  paid_at: ISODate | null;
+  user_id: UUID | null;
+  notes: string | null;
+  voided_at: ISODate | null;
+  voided_by: UUID | null;
+}
+
 export type ProductChangeAction = 'created' | 'updated' | 'deleted';
 /** De dónde vino el cambio. */
 export type ProductChangeSource = 'manual' | 'import' | 'purchase' | 'bulk_price';
@@ -352,7 +397,7 @@ export interface SyncQueueEntry {
   created_at: ISODate;
 }
 
-export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices' | 'screen_exits' | 'sale_returns' | 'task_templates' | 'day_tasks' | 'task_assignments' | 'cash_promos' | 'product_promos' | 'shift_reports' | 'unload_items';
+export type SyncTable = 'stores' | 'categories' | 'products' | 'barcodes' | 'users' | 'sales' | 'sale_items' | 'payments' | 'stock_movements' | 'suppliers' | 'purchases' | 'purchase_items' | 'product_cost_history' | 'employee_accounts' | 'account_movements' | 'cash_sessions' | 'cash_movements' | 'product_changes' | 'staff_schedules' | 'supplier_invoices' | 'screen_exits' | 'sale_returns' | 'task_templates' | 'day_tasks' | 'task_assignments' | 'cash_promos' | 'product_promos' | 'shift_reports' | 'unload_items' | 'wholesale_customers' | 'wholesale_sales';
 
 /**
  * Resumen de un turno cerrado, listo para mandar por mail. Sólo se sube (no se baja a los dispositivos):

@@ -3,6 +3,7 @@ import type { SaleDetail } from '@/database/repositories/sales';
 import { formatMoney } from './money';
 import { PAYMENT_LABELS } from './payment';
 import { getPrintSettings, type PrintSettings } from './printSettings';
+import type { WholesaleCustomer, WholesaleSale } from '@/types/domain';
 
 export interface TicketContext extends SaleDetail {
   storeName: string;
@@ -176,3 +177,60 @@ ${showProfit ? row('Ganancia', cut.profit) : ''}
 <hr><div class="c">Impreso ${esc(printed)}</div>
 </body></html>`;
 }
+
+export interface WholesaleTicket {
+  sale: WholesaleSale;
+  storeName: string;
+  storeAddress?: string | null;
+  customer: Pick<WholesaleCustomer, 'name' | 'phone' | 'tax_id' | 'address'> | null;
+  seller: string | null;
+}
+
+/** Ticket de una venta mayorista, en la misma ticketera y con los mismos textos de Ajustes. */
+export function renderWholesaleHtml({ sale, storeName, storeAddress, customer, seller }: WholesaleTicket, settings: PrintSettings = getPrintSettings()): string {
+  const narrow = settings.paper === 58;
+  const date = new Date(sale.occurred_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+  const rows = sale.items
+    .map(
+      (i) => `<div class="item">${esc(i.name)}</div>
+<div class="row"><span>${qty(i.quantity)} x ${formatMoney(i.price_cents)}</span><span>${formatMoney(Math.round(i.quantity * i.price_cents))}</span></div>`,
+    )
+    .join('');
+  const name = customer?.name ?? sale.customer_name;
+  const client = name
+    ? `<div>Cliente: ${esc(name)}</div>${customer?.tax_id ? `<div>CUIT: ${esc(customer.tax_id)}</div>` : ''}${customer?.address ? `<div>${esc(customer.address)}</div>` : ''}${customer?.phone ? `<div>Tel.: ${esc(customer.phone)}</div>` : ''}<hr>`
+    : '';
+  const payment = sale.paid_at
+    ? `<div class="row"><span>Pagó con</span><span>${esc(WHOLESALE_LABELS[sale.method ?? ''] ?? '—')}</span></div>`
+    : '<div class="c total">PENDIENTE DE PAGO</div>';
+
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(sale.number)}</title><style>
+@page { size: ${settings.paper}mm auto; margin: 0; }
+html, body { margin: 0; padding: 0; }
+body { width: ${narrow ? 48 : 72}mm; margin: 0 auto; padding: 3mm 0 6mm; font: ${narrow ? 11 : 12}px/1.3 'Courier New', monospace; color: #000; background: #fff; }
+h1 { font-size: ${narrow ? 16 : 18}px; margin: 0 0 2px; text-align: center; letter-spacing: 1px; }
+.c { text-align: center; overflow-wrap: anywhere; } .row { display: flex; justify-content: space-between; gap: 6px; }
+.row span:last-child { white-space: nowrap; }
+.item { margin-top: 3px; font-weight: bold; overflow-wrap: anywhere; } hr { border: 0; border-top: 1px dashed #000; margin: 5px 0; }
+.total { font-size: ${narrow ? 14 : 16}px; font-weight: bold; }
+</style></head><body>
+${settings.title.trim() ? `<h1>${esc(settings.title.trim())}</h1>` : ''}
+${lines(settings.header)}
+<div class="c">Sucursal ${esc(storeName)}</div>
+${storeAddress ? `<div class="c">${esc(storeAddress)}</div>` : ''}
+<hr>
+<div class="c total">VENTA MAYORISTA</div>
+<div class="c">${esc(date)}</div>
+<div class="c">Ticket ${esc(sale.number)}</div>
+${seller ? `<div class="c">Atendió: ${esc(seller)}</div>` : ''}
+<hr>${client}${rows}<hr>
+<div class="row total"><span>TOTAL</span><span>${formatMoney(sale.total_cents)}</span></div>
+<hr>${payment}
+${sale.notes ? `<hr><div>${esc(sale.notes)}</div>` : ''}
+${sale.voided_at ? '<hr><div class="c total">ANULADO</div>' : ''}
+<hr>${lines(settings.footer)}
+<div class="c">Comprobante no válido como factura</div>
+</body></html>`;
+}
+
+const WHOLESALE_LABELS: Record<string, string> = { cash: 'Efectivo', card: 'Tarjeta/QR', transfer: 'Transferencia' };

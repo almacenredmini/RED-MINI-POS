@@ -23,6 +23,8 @@ const PurchaseEditPage = lazy(() => import('@/pages/PurchaseEditPage').then((m) 
 const PurchasesPage = lazy(() => import('@/pages/PurchasesPage').then((m) => ({ default: m.PurchasesPage })));
 const CashPage = lazy(() => import('@/pages/CashPage').then((m) => ({ default: m.CashPage })));
 const SchedulesPage = lazy(() => import('@/pages/SchedulesPage').then((m) => ({ default: m.SchedulesPage })));
+const WholesalePage = lazy(() => import('@/pages/WholesalePage').then((m) => ({ default: m.WholesalePage })));
+const WholesaleEditPage = lazy(() => import('@/pages/WholesaleEditPage').then((m) => ({ default: m.WholesaleEditPage })));
 const SupplierInvoicePage = lazy(() => import('@/pages/SupplierInvoicePage').then((m) => ({ default: m.SupplierInvoicePage })));
 
 /**
@@ -49,6 +51,9 @@ export const router = createHashRouter([
       { path: 'ventas', element: <Navigate to="/vender" replace /> },
       { path: 'vender', element: <RequirePermission permission="sales.create"><PosPage /></RequirePermission> },
       { path: 'horarios', element: <RequirePermission permission="schedules.manage"><SchedulesPage /></RequirePermission> },
+      { path: 'mayorista', element: <RequirePermission permission="wholesale.manage"><WholesalePage /></RequirePermission> },
+      { path: 'mayorista/nuevo', element: <RequirePermission permission="wholesale.manage"><WholesaleEditPage /></RequirePermission> },
+      { path: 'mayorista/:id', element: <RequirePermission permission="wholesale.manage"><WholesaleEditPage /></RequirePermission> },
       { path: 'cuentas', element: <RequirePermission permission="accounts.manage"><AccountsPage /></RequirePermission> },
       { path: 'inventario/descargar', element: <RequirePermission permission="stock.adjust"><UnloadPage /></RequirePermission> },
       { path: 'inventario', element: <RequirePermission permission="stock.adjust"><InventoryPage /></RequirePermission> },

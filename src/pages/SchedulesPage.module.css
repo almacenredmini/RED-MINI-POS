@@ -284,3 +284,39 @@
   outline: 1px solid var(--accent);
   outline-offset: -3px;
 }
+
+.weekLabel {
+  white-space: nowrap;
+}
+
+.month {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* Celular: sucursal, semana y mes, uno debajo del otro, sin cortes raros. */
+@media (max-width: 600px) {
+  .filters {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .week {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    text-align: center;
+  }
+
+  .thisWeek {
+    grid-column: 1 / -1;
+  }
+
+  .month {
+    display: grid;
+    grid-template-columns: auto 1fr;
+  }
+}
