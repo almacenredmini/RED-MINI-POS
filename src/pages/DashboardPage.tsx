@@ -1,40 +1,28 @@
+import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/database/db';
-import { effectiveMinStock, getAutoMinMap } from '@/database/repositories/minStock';
+import { listShortages } from '@/database/repositories/minStock';
+import { ShortagesModal } from '@/components/inventory/ShortagesModal';
 import { daySummary } from '@/database/repositories/sales';
 import { slowMovers } from '@/database/repositories/reports';
 import { idleText } from '@/components/reports/SlowMovers';
-import { getStockMap } from '@/database/repositories/stores';
 import { useCurrentStore } from '@/contexts/DeviceContext';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { SyncIndicator, usePendingSyncCount } from '@/components/layout/SyncIndicator';
-import { ButtonLink } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card, StatCard } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { formatMoney } from '@/services/money';
 import styles from './DashboardPage.module.css';
 
-function useLowStock(storeId: string) {
-  return useLiveQuery(
-    async () => {
-      const [products, stock, autoMin] = await Promise.all([db.products.filter((p) => !p.deleted_at && p.active && p.track_stock !== false).toArray(), getStockMap(storeId), getAutoMinMap(storeId)]);
-      return products
-        .map((p) => ({ product: p, qty: stock.get(p.id) ?? 0, min: effectiveMinStock(p, autoMin) }))
-        .filter(({ qty, min }) => min > 0 && qty <= min)
-        .sort((a, b) => a.qty - b.qty);
-    },
-    [storeId],
-    [],
-  );
-}
-
 export function DashboardPage() {
   const store = useCurrentStore();
   const online = useOnlineStatus();
   const pending = usePendingSyncCount();
   const productCount = useLiveQuery(() => db.products.filter((p) => !p.deleted_at).count(), [], 0);
-  const lowStock = useLowStock(store.id);
+  const lowStock = useLiveQuery(() => listShortages(store.id), [store.id], []);
+  const [showAll, setShowAll] = useState(false);
   // Comestibles con stock que no se vendieron en 30 días: puede haber mercadería por vencer.
   const stale = useLiveQuery(async () => (await slowMovers(store.id, 30, 0)).filter((m) => m.perishable), [store.id], []);
   const day = useLiveQuery(() => daySummary(store.id), [store.id], { tickets: 0, total: 0, cash: 0, card: 0, transfer: 0, account: 0 });
@@ -55,20 +43,27 @@ export function DashboardPage() {
       <div className={styles.panels}>
         <Card title="Alertas de stock" action={<Badge tone={lowStock.length ? 'warning' : 'success'}>{lowStock.length}</Badge>}>
           {lowStock.length === 0 ? (
-            <p className="muted">Sin productos por debajo del mínimo.</p>
+            <p className="muted">No falta nada: tenés al menos lo que vendiste el mismo día de la semana pasada.</p>
           ) : (
-            <ul className={styles.alerts}>
-              {lowStock.slice(0, 8).map(({ product, qty, min }) => (
-                <li key={product.id}>
-                  <span>{product.name}</span>
-                  <Badge tone={qty <= 0 ? 'danger' : 'warning'}>
-                    {qty} / mín {min}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className={styles.alerts}>
+                {lowStock.slice(0, 8).map(({ product, have, should, missing }) => (
+                  <li key={product.id}>
+                    <span>{product.name}</span>
+                    <Badge tone={have <= 0 ? 'danger' : 'warning'}>
+                      Tiene {have} · debería {should} · faltan {missing}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+              <Button size="sm" icon="inventory" onClick={() => setShowAll(true)}>
+                Ver todo lo que falta ({lowStock.length})
+              </Button>
+            </>
           )}
         </Card>
+
+        {showAll && <ShortagesModal items={lowStock} storeName={store.name} onClose={() => setShowAll(false)} />}
 
         {stale.length > 0 && (
           <Card title="Revisá vencimientos" action={<Badge tone="warning">{stale.length}</Badge>}>

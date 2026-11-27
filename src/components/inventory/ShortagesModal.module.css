@@ -1,0 +1,69 @@
+.intro {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.intro strong {
+  color: var(--text);
+}
+
+.wrap {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  padding: 8px 6px;
+  background: var(--surface);
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.table td {
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table th:global(.num),
+.table td:global(.num) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.name {
+  overflow-wrap: anywhere;
+}
+
+.mark {
+  color: var(--text-muted);
+}
+
+.out {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.missing {
+  font-weight: 700;
+  color: var(--warning);
+}
+
+.note {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}

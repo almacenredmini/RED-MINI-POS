@@ -201,18 +201,18 @@ export function ProductForm({ initial, productId, submitting, onSubmit, footer }
               {!unlimited && (
                 <label className={styles.toggle}>
                   <input type="checkbox" checked={v.auto_min_stock} onChange={(e) => set('auto_min_stock', e.target.checked)} />
-                  <span>Ajustar el mínimo cada semana según las ventas</span>
+                  <span>Que debería tener lo vendido el mismo día de la semana pasada (se actualiza todos los días)</span>
                 </label>
               )}
               {!unlimited && v.auto_min_stock && autoMin && (
                 <p className="muted num">
-                  Hoy en {store.name}: mínimo {autoMin.min_stock} (vende {Math.round(autoMin.weekly_avg * 10) / 10} por semana)
+                  Hoy en {store.name}: debería tener {autoMin.min_stock} (vendió {Math.round(autoMin.weekly_avg * 10) / 10} el mismo día de la semana pasada)
                 </p>
               )}
               {!unlimited && (
               <Field
                 label={v.auto_min_stock ? 'Stock mínimo inicial' : 'Stock mínimo'}
-                hint={v.auto_min_stock ? 'Se usa hasta que el producto tenga ventas en la sucursal.' : 'Alerta cuando el stock llegue a este valor.'}
+                hint={v.auto_min_stock ? 'Se usa si no se vendió ese día de la semana pasada.' : 'Alerta cuando el stock llegue a este valor.'}
               >
                 {(id) => (
                   <Input id={id} type="number" min={0} inputMode="numeric" placeholder="0" value={v.min_stock || ''} onFocus={(e) => e.target.select()} onChange={(e) => set('min_stock', Math.max(0, Number(e.target.value) || 0))} />

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate, type NavLinkProps } from 're
 import { useAuth } from '@/contexts/AuthContext';
 import { useDevice } from '@/contexts/DeviceContext';
 import { useToast } from '@/contexts/ToastContext';
-import { recalcMinStockIfNewWeek } from '@/database/repositories/minStock';
+import { recalcMinStockIfNewDay } from '@/database/repositories/minStock';
 import { useHotkeys } from '@/hooks/useHotkeys';
 import { EmptyState } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -56,8 +56,13 @@ export function AppShell() {
     return () => document.removeEventListener('pointerdown', close);
   }, []);
 
+  // "Lo que debería tener" se recalcula una vez por día; la PC queda prendida de un día para otro.
   useEffect(() => {
-    if (storeId) recalcMinStockIfNewWeek(storeId).catch(console.error);
+    if (!storeId) return;
+    const run = () => void recalcMinStockIfNewDay(storeId).catch(console.error);
+    run();
+    const timer = window.setInterval(run, 30 * 60_000);
+    return () => window.clearInterval(timer);
   }, [storeId]);
 
   if (!user) return restoring ? <div className="boot"><Logo /></div> : <LoginPage />;
