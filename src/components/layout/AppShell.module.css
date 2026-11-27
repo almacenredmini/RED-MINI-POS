@@ -168,6 +168,18 @@
   color: var(--accent-text);
 }
 
+/* El atajo de teclado, chiquito al lado del nombre: "Vender F1". */
+.hotkey {
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.3;
+  font-family: inherit;
+  opacity: 0.6;
+}
+
 .more {
   position: relative;
   display: none;

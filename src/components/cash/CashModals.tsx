@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Field, Input } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
+import { CASH_TOLERANCE_CENTS, diffText, withinTolerance } from '@/services/cashDiff';
 import { formatMoney, parseMoney } from '@/services/money';
 import { PAYMENT_LABELS } from '@/services/payment';
 import type { CashSession, Payment } from '@/types/domain';
@@ -19,11 +20,12 @@ export function useUserNames(): Map<string, string> {
   return useLiveQuery(async () => new Map((await db.users.toArray()).map((u) => [u.id, u.name])), [], new Map());
 }
 
-/** Diferencia en verde si cuadra, en rojo si falta, en amarillo si sobra. */
+/** Diferencia en verde si cuadra (hasta la tolerancia), en rojo si falta, en amarillo si sobra. */
 export function DifferenceBadge({ value }: { value: number | null }) {
   if (value === null) return <Badge tone="neutral">Abierta</Badge>;
   if (value === 0) return <Badge tone="success">Sin diferencia</Badge>;
-  return <Badge tone={value < 0 ? 'danger' : 'warning'}>{value < 0 ? `Faltan ${formatMoney(-value)}` : `Sobran ${formatMoney(value)}`}</Badge>;
+  if (withinTolerance(value)) return <Badge tone="success">{diffText(value)} · tolerado</Badge>;
+  return <Badge tone={value < 0 ? 'danger' : 'warning'}>{diffText(value)}</Badge>;
 }
 
 /** Detalle completo de una caja. Sólo lo ve quien tiene `cash.manage`: el cajero cierra a ciegas. */
@@ -202,7 +204,7 @@ export function CloseCashModal({
         title="Caja cerrada"
         onClose={() => void finish()}
         footer={
-          <Button variant="primary" onClick={() => void finish()} {...(result.difference === 0 && { 'data-autofocus': true })}>
+          <Button variant="primary" onClick={() => void finish()} {...(withinTolerance(result.difference) && { 'data-autofocus': true })}>
             {exitAfter ? 'Salir' : 'Listo'}
           </Button>
         }
@@ -210,6 +212,8 @@ export function CloseCashModal({
         <div className={styles.result}>
           {result.difference === 0 ? (
             <p className={styles.ok}>Caja cerrada. No hay diferencia.</p>
+          ) : withinTolerance(result.difference) ? (
+            <p className={styles.ok}>Caja cerrada. La diferencia está dentro de la tolerancia de {formatMoney(CASH_TOLERANCE_CENTS)}.</p>
           ) : (
             <>
               <p className={styles.bad}>Tenés una diferencia de caja.</p>

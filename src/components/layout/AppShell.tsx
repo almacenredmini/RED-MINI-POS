@@ -28,12 +28,20 @@ export function AppShell() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const navigate = useNavigate();
 
-  // F1 lleva a Vender desde cualquier pantalla. En Vender no hace nada acá: con el cobro abierto es "Cerrar e imprimir".
-  useHotkeys({
-    F1: () => {
-      if (user && pathname !== '/vender' && can('sales.create')) navigate('/vender');
-    },
-  });
+  // F1 Vender, F2 Productos, F3 Inventario y F4 Corte desde cualquier pantalla.
+  // Con una ventana abierta no navegan: en el cobro F1-F4 son "Cerrar e imprimir", "sin imprimir", Efectivo y Tarjeta.
+  useHotkeys(
+    Object.fromEntries(
+      NAV_ITEMS.filter((i) => i.hotkey).map((item) => [
+        item.hotkey,
+        () => {
+          if (!user || document.querySelector('dialog[open]') || pathname.startsWith(item.to)) return;
+          if (!can(item.permission)) return toast('No tenés permiso para entrar a esa pantalla', 'error');
+          navigate(item.to);
+        },
+      ]),
+    ),
+  );
 
   // El menú "Más" del celular se cierra al cambiar de pantalla.
   useEffect(() => setSheetOpen(false), [pathname]);
@@ -83,6 +91,7 @@ export function AppShell() {
     <NavLink key={item.to} {...linkProps(item, (active) => `${styles.menuButton} ${extraClass} ${active ? styles.active : ''}`)}>
       <Icon name={item.icon} size={18} />
       <span>{item.label}</span>
+      {item.hotkey && <kbd className={styles.hotkey}>{item.hotkey}</kbd>}
       {!can(item.permission) && <Icon name="lock" size={11} className={styles.lockBadge} />}
     </NavLink>
   );

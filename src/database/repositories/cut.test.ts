@@ -117,9 +117,11 @@ describe('mail del corte', () => {
     const report = queued[0]!.payload as { cash_session_id: string; subject: string; html: string };
     expect(report.cash_session_id).toBe(s.sale.cash_session_id);
     expect(report.subject).toContain('Corte del turno de CAMI <b> · Oroño');
-    expect(report.subject).toContain('FALTAN $');
+    // Faltan $5: entra en la tolerancia de $1.000, así que el asunto no lo marca.
+    expect(report.subject).not.toContain('FALTAN');
     expect(report.html).toContain('CAMI &#60;b&#62;'); // el nombre va escapado en el HTML
-    expect(report.html).toContain('Faltan');
+    expect(report.html).toContain('Faltan $');
+    expect(report.html).toContain('(tolerado)');
     expect(report.html).toMatch(/Número de ventas.*?>2</s);
   });
 });

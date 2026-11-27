@@ -15,6 +15,7 @@ import { Card, EmptyState } from '@/components/ui/Card';
 import { Input, Select } from '@/components/ui/Field';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { peekDeviceId } from '@/database/meta';
+import { withinTolerance } from '@/services/cashDiff';
 import { formatMoney } from '@/services/money';
 import type { CashSession } from '@/types/domain';
 import styles from './CashPage.module.css';
@@ -321,7 +322,7 @@ function CashHistory() {
     return Promise.all(rows.map(async (s) => ({ session: s, summary: await cashSummary(s.id) })));
   }, [from, to, storeId], []);
 
-  const visible = onlyDiff ? sessions.filter(({ session }) => (difference(session) ?? 0) !== 0) : sessions;
+  const visible = onlyDiff ? sessions.filter(({ session }) => !withinTolerance(difference(session) ?? 0)) : sessions;
   const storeName = (id: string) => stores.find((s) => s.id === id)?.name ?? '';
 
   return (
@@ -340,7 +341,7 @@ function CashHistory() {
           </Select>
         )}
         <label className={styles.check}>
-          <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} /> Sólo con diferencia
+          <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} /> Sólo con diferencia (más de $1.000)
         </label>
       </div>
       {visible.length === 0 ? (

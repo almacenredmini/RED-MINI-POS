@@ -1,4 +1,5 @@
 import type { DailyCut } from '@/database/repositories/cut';
+import { diffText as describeDiff, withinTolerance } from './cashDiff';
 import { formatMoney } from './money';
 import { PAYMENT_LABELS } from './payment';
 
@@ -30,7 +31,8 @@ function section(title: string, rows: string): string {
 
 export function cutEmailSubject({ storeName, cashier, openedAt, closedAt, cut }: CutEmail): string {
   const diff = typeof cut.counted === 'number' ? cut.counted - cut.cashInDrawer : 0;
-  const tail = diff < 0 ? ` · FALTAN ${formatMoney(-diff)}` : diff > 0 ? ` · SOBRAN ${formatMoney(diff)}` : '';
+  // Dentro de la tolerancia no se marca en el asunto: se ve igual en el detalle.
+  const tail = withinTolerance(diff) ? '' : ` · ${describeDiff(diff).toUpperCase()}`;
   return `Corte del turno de ${cashier} · ${storeName} · ${hour(openedAt)} a ${hour(closedAt)}${tail}`;
 }
 
@@ -38,7 +40,7 @@ export function renderCutEmail(info: CutEmail): string {
   const { storeName, cashier, openedAt, closedAt, cut } = info;
   const money = (n: number, sign = '') => `${sign}${esc(formatMoney(n))}`;
   const diff = typeof cut.counted === 'number' ? cut.counted - cut.cashInDrawer : null;
-  const diffText = diff === null ? '—' : diff === 0 ? 'Sin diferencia' : diff < 0 ? `Faltan ${esc(formatMoney(-diff))}` : `Sobran ${esc(formatMoney(diff))}`;
+  const diffText = diff === null ? '—' : esc(describeDiff(diff)) + (diff !== 0 && withinTolerance(diff) ? ' (tolerado)' : '');
 
   const cash = [
     row('Ventas en efectivo', money(cut.cashSales, '+ '), { color: GREEN }),
@@ -46,7 +48,7 @@ export function renderCutEmail(info: CutEmail): string {
     row('Retiros', money(cut.withdrawals, '- '), { color: cut.withdrawals ? RED : undefined }),
     row('Tenía que haber', money(cut.cashInDrawer), { bold: true }),
     typeof cut.counted === 'number' ? row('Contó al cerrar', money(cut.counted), { bold: true }) : '',
-    row('Diferencia', diffText, { bold: true, color: diff === null || diff === 0 ? GREEN : RED }),
+    row('Diferencia', diffText, { bold: true, color: diff === null || withinTolerance(diff) ? GREEN : RED }),
   ].join('');
   const methods = Object.entries(cut.byMethod)
     .filter(([, v]) => v)
